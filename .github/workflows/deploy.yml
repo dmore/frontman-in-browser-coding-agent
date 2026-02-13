@@ -72,6 +72,14 @@ jobs:
         if: always()
         run: rm -f ~/.ssh/deploy_key
 
+      - name: Cleanup Docker artifacts
+        if: always()
+        run: |
+          # Remove any leftover build images (frontman-builder, etc.)
+          docker images --filter "reference=frontman-*" -q | xargs -r docker rmi -f 2>/dev/null || true
+          # Prune BuildKit cache
+          docker buildx prune -f 2>/dev/null || true
+
   # ==========================================================================
   # Client: build standalone bundle on CI → deploy to Cloudflare Pages
   # ==========================================================================
@@ -119,3 +127,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy libs/client/dist --project-name=frontman-client --branch=main
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules

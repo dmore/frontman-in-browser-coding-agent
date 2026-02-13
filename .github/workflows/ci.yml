@@ -33,6 +33,13 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
+          rm -rf /tmp/runner/work/_temp
+
   build:
     name: Build
     runs-on: self-hosted
@@ -64,6 +71,12 @@ jobs:
 
       - name: Build project
         run: make build
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
 
   test-frontman-client:
     name: Test frontman-client
@@ -107,6 +120,12 @@ jobs:
           skip_covered: false
           only_changed_files: false
 
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
+
   test-frontman-core:
     name: Test frontman-core
     needs: [setup]
@@ -148,6 +167,12 @@ jobs:
           show_missing: true
           skip_covered: false
           only_changed_files: false
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
 
   test-frontman-nextjs:
     name: Test frontman-nextjs
@@ -191,6 +216,12 @@ jobs:
           skip_covered: false
           only_changed_files: false
 
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
+
   lint-frontman-server:
     name: Lint frontman-server
     runs-on: self-hosted
@@ -232,6 +263,11 @@ jobs:
 
       - name: Run lint
         run: make -C apps/frontman_server lint
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf apps/frontman_server/_build apps/frontman_server/deps
 
   test-frontman-server:
     name: Test frontman-server
@@ -315,6 +351,11 @@ jobs:
           skip_covered: false
           only_changed_files: false
 
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf apps/frontman_server/_build apps/frontman_server/deps
+
   dialyzer-frontman-server:
     name: Dialyzer frontman-server
     runs-on: self-hosted
@@ -366,6 +407,11 @@ jobs:
       - name: Run Dialyzer
         run: make -C apps/frontman_server dialyzer
 
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf apps/frontman_server/_build apps/frontman_server/deps
+
   test-react-statestore:
     name: Test react-statestore
     needs: [setup]
@@ -407,6 +453,12 @@ jobs:
           show_missing: true
           skip_covered: false
           only_changed_files: false
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
 
   test-client:
     name: Test client
@@ -450,6 +502,12 @@ jobs:
           skip_covered: false
           only_changed_files: false
 
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
+
   test-context-loader:
     name: Test context-loader
     needs: [setup]
@@ -491,6 +549,12 @@ jobs:
           show_missing: true
           skip_covered: false
           only_changed_files: false
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
 
   lint-client:
     name: Lint libs/client
@@ -538,6 +602,12 @@ jobs:
       - name: Run biome lint
         if: steps.changes.outputs.client == 'true'
         run: cd libs/client && npx biome lint .
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
 
   protocol-check:
     name: Protocol schema check
@@ -598,6 +668,12 @@ jobs:
         if: steps.changes.outputs.protocol == 'true'
         run: node libs/frontman-protocol/scripts/CheckBreakingChanges.res.mjs
 
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules
+
   dead-code-client:
     name: Dead code analysis (client)
     needs: [setup]
@@ -637,3 +713,9 @@ jobs:
             exit 1
           fi
           echo "No dead code found."
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          rm -rf node_modules .yarn/install-state.gz
+          rm -rf libs/*/node_modules apps/*/node_modules test/sites/*/node_modules

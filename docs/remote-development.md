@@ -591,12 +591,31 @@ rm -rf test/sites/blog-starter/.next
 
 ### Out of Disk Space
 
-```bash
-# SSH into server and clean Docker
-ssh root@DEVPOD_SERVER 'docker system prune -a'
+The biggest disk consumers are **GitHub Action runner writable layers** (yarn cache, mise installs, build artifacts accumulate ~5-7GB per runner per CI run) and **stale Docker build images**.
 
+**Automated protections in place:**
+- Runner work dirs are mounted as `tmpfs` (RAM-backed) so they don't persist to the overlay filesystem
+- CI jobs clean up `node_modules` and build artifacts after each run
+- Nightly cron (4:00 AM) prunes Docker, clears BuildKit cache, and restarts runners
+- Weekly cron (Sunday 3:00 AM) removes all unused Docker images
+
+**Manual cleanup if needed:**
+
+```bash
 # Check disk usage
-ssh root@DEVPOD_SERVER 'df -h'
+ssh root@DEVPOD_SERVER 'df -h / && docker system df'
+
+# Clear BuildKit cache (separate from docker system prune)
+ssh root@DEVPOD_SERVER 'docker buildx prune -a -f'
+
+# Restart runners to clear any writable layer bloat
+ssh root@DEVPOD_SERVER 'cd /home/github-runner && docker compose -f docker-compose.ci.yml down && docker compose -f docker-compose.ci.yml up -d'
+
+# Remove stale build images
+ssh root@DEVPOD_SERVER 'docker images --filter "reference=frontman-*" -q | xargs -r docker rmi -f'
+
+# Nuclear option — remove everything (requires rebuilding all workspaces)
+ssh root@DEVPOD_SERVER 'docker system prune -a --volumes -f && docker buildx prune -a -f'
 ```
 
 ## Server Maintenance
