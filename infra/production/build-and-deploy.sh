@@ -54,7 +54,7 @@ mix esbuild frontman_server --minify
 mix phx.digest
 
 echo ">>> Building release..."
-mix release
+mix release --overwrite
 
 echo ""
 echo "=== Build Complete ==="
