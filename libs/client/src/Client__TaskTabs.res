@@ -74,6 +74,11 @@ let make = (~onSettingsClick: unit => unit) => {
 
   let iconSize = {"width": "14px", "height": "14px"}
 
+  // Shared style for every icon button in the header bar.
+  // Ghost variant + fixed 28×28 size + muted icon color.
+  // Re-use this for any new header action to keep them visually aligned.
+  let headerIconBtn = "cursor-pointer h-7 w-7 p-0 text-zinc-400"
+
   // Main render — compact bar layout
   <div className="h-10 border-b flex items-center">
     // Logo
@@ -95,7 +100,7 @@ let make = (~onSettingsClick: unit => unit) => {
             variant=#ghost
             size=#sm
             onClick={handleNewTask}
-            className="cursor-pointer h-7 w-7 p-0"
+            className=headerIconBtn
           >
             <Icons.PlusIcon style={iconSize} />
           </Button.Button>
@@ -109,7 +114,7 @@ let make = (~onSettingsClick: unit => unit) => {
         <Tooltip.Tooltip>
           <Tooltip.TooltipTrigger asChild=true>
             <DropdownMenu.DropdownMenuTrigger asChild=true>
-              <Button.Button variant=#ghost size=#sm className="cursor-pointer h-7 w-7 p-0">
+              <Button.Button variant=#ghost size=#sm className=headerIconBtn>
                 <Icons.CountdownTimerIcon style={iconSize} />
               </Button.Button>
             </DropdownMenu.DropdownMenuTrigger>
@@ -166,31 +171,44 @@ let make = (~onSettingsClick: unit => unit) => {
               </DropdownMenu.DropdownMenuLabel>}
         </DropdownMenu.DropdownMenuContent>
       </DropdownMenu.DropdownMenu>
-      // Help button
+      // Help button (Discord link)
       <Tooltip.Tooltip>
         <Tooltip.TooltipTrigger asChild=true>
-          <a
-            href="https://discord.gg/J77jBzMM"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-7 w-7 rounded-md text-zinc-400 transition-all duration-200 flex items-center justify-center hover:text-[#5865F2] hover:bg-[#5865F2]/10 cursor-pointer"
+          <Button.Button
+            variant=#ghost
+            size=#sm
+            asChild=true
+            className={headerIconBtn ++ " hover:text-[#5865F2] hover:bg-[#5865F2]/10"}
           >
-            <Icons.QuestionMarkCircledIcon style={iconSize} />
-          </a>
+            <a
+              href="https://discord.gg/J77jBzMM"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Icons.QuestionMarkCircledIcon style={iconSize} />
+            </a>
+          </Button.Button>
         </Tooltip.TooltipTrigger>
         <Tooltip.TooltipContent side="bottom" align="end" sideOffset=4>
           {React.string("Need help? Join our Discord")}
         </Tooltip.TooltipContent>
       </Tooltip.Tooltip>
       // Settings button
-      <button
-        type_="button"
-        className="h-7 w-7 rounded-md border border-zinc-800/70 bg-zinc-900/70 text-zinc-200 shadow-sm backdrop-blur transition-all duration-200 flex items-center justify-center hover:border-zinc-700 hover:bg-zinc-800/90 hover:shadow-md cursor-pointer"
-        onClick={_ => onSettingsClick()}
-        title="Settings"
-      >
-        <Icons.GearIcon style={iconSize} />
-      </button>
+      <Tooltip.Tooltip>
+        <Tooltip.TooltipTrigger asChild=true>
+          <Button.Button
+            variant=#ghost
+            size=#sm
+            onClick={_ => onSettingsClick()}
+            className=headerIconBtn
+          >
+            <Icons.GearIcon style={iconSize} />
+          </Button.Button>
+        </Tooltip.TooltipTrigger>
+        <Tooltip.TooltipContent sideOffset=4>
+          {React.string("Settings")}
+        </Tooltip.TooltipContent>
+      </Tooltip.Tooltip>
     </div>
     // Delete confirmation dialog
     <AlertDialog.AlertDialog

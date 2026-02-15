@@ -202,10 +202,21 @@
  * Streamdown Overrides
  * ============================================================================ */
 
-/* Inline code: streamdown uses bg-muted (light bg) but parent text is zinc-300
-   (light gray for dark theme), resulting in gray-on-white. Force dark text. */
+/* Streamdown theme overrides
+   The chatbox always sits on a dark-purple background (#180C2D) but does NOT
+   apply the `.dark` class, so Tailwind theme variables (--primary, --muted, etc.)
+   resolve to their light-mode values (near-black/near-white). Override every
+   element that relies on those variables to use explicit colors instead. */
+
+/* Inline code */
 .font-ibm-plex-mono [data-streamdown="inline-code"] {
-	color: rgb(39 39 42); /* zinc-800 */
+	background-color: rgba(255, 255, 255, 0.1);
+	color: rgb(228 228 231); /* zinc-200 */
+}
+
+/* Links — streamdown uses text-primary (near-black in light mode) */
+.font-ibm-plex-mono [data-streamdown="link"] {
+	color: rgb(196 181 253); /* violet-300 */
 }
 
 /* Code block: streamdown uses overflow-hidden + rounded-xl on the container,
