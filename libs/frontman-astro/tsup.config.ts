@@ -13,8 +13,6 @@ const sharedExternal = [
   'astro',
   'astro/toolbar',
   'astro/config',
-  'astro:middleware',
-  '@astrojs/node',
   // Node.js built-ins
   'fs',
   'path',
@@ -41,7 +39,7 @@ const sharedExternal = [
 export default defineConfig([
   // Main library entry point
   {
-    entry: { 'index': './src/FrontmanAstro.res.mjs' },
+    entry: { 'index': './index.mjs' },
     format: ['esm'],
     outDir: 'dist',
     clean: true,
@@ -73,18 +71,6 @@ export default defineConfig([
     external: sharedExternal,
     platform: 'browser',
     target: 'es2020',
-    treeshake: true,
-  },
-  // CLI entry point
-  {
-    entry: { 'cli': './src/cli/cli.mjs' },
-    format: ['esm'],
-    outDir: 'dist',
-    clean: false,
-    noExternal: sharedNoExternal,
-    external: sharedExternal,
-    platform: 'node',
-    target: 'node18',
     treeshake: true,
   },
 ]);

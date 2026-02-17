@@ -3,6 +3,29 @@ defmodule FrontmanServer.Agents.LLMClientTest do
 
   alias FrontmanServer.Agents.LLMClient
 
+  describe "ReqLLM error chunk contract" do
+    test "ReqLLM.StreamChunk.error/1 creates an :error type chunk" do
+      chunk = ReqLLM.StreamChunk.error("image exceeds the maximum allowed size")
+
+      assert chunk.type == :error
+      assert chunk.text == "image exceeds the maximum allowed size"
+      assert chunk.metadata == %{}
+    end
+
+    test "ReqLLM.StreamChunk.error/2 preserves metadata" do
+      chunk =
+        ReqLLM.StreamChunk.error("HTTP 400: Request too large", %{
+          status: 400,
+          provider: :anthropic
+        })
+
+      assert chunk.type == :error
+      assert chunk.text == "HTTP 400: Request too large"
+      assert chunk.metadata.status == 400
+      assert chunk.metadata.provider == :anthropic
+    end
+  end
+
   describe "to_reqllm_tool/3" do
     setup do
       tool = %Swarm.Tool{
