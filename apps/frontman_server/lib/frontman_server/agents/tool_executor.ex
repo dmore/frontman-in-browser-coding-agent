@@ -29,6 +29,7 @@ defmodule FrontmanServer.Agents.ToolExecutor do
   alias FrontmanServer.Tasks.Interaction
   alias FrontmanServer.Tools
   alias FrontmanServer.Tools.Backend
+  alias Swarm.Message.ContentPart
 
   @tool_timeout_ms 60_000
 
@@ -276,7 +277,7 @@ defmodule FrontmanServer.Agents.ToolExecutor do
     with {:ok, decoded} when is_map(decoded) <- Jason.decode(json_string),
          data_url when is_binary(data_url) <- Map.get(decoded, field_name),
          {:ok, binary, mime} <- decode_data_url(data_url) do
-      {:ok, [Swarm.Message.ContentPart.image(binary, mime)]}
+      {:ok, [ContentPart.image(binary, mime)]}
     else
       _ -> :no_image
     end
