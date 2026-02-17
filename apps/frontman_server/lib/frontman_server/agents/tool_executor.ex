@@ -24,6 +24,7 @@ defmodule FrontmanServer.Agents.ToolExecutor do
   require Logger
 
   alias FrontmanServer.Accounts.Scope
+  alias FrontmanServer.Agents.SchemaTransformer
   alias FrontmanServer.Tasks
   alias FrontmanServer.Tasks.Interaction
   alias FrontmanServer.Tools
@@ -58,6 +59,11 @@ defmodule FrontmanServer.Agents.ToolExecutor do
     llm_opts = Keyword.fetch!(opts, :llm_opts)
 
     fn tool_call ->
+      # Strip null values from arguments. OpenAI strict mode makes optional fields
+      # nullable (anyOf: [type, null]), so the model sends null instead of omitting.
+      # Tools expect missing keys, not null values.
+      tool_call = strip_null_arguments(tool_call)
+
       is_mcp_tool = register_if_mcp_tool(tool_call)
 
       # For MCP tools, publish interaction so TaskChannel can route to client.
@@ -186,6 +192,19 @@ defmodule FrontmanServer.Agents.ToolExecutor do
         {:error, "Task not found or unauthorized"}
     end
   end
+
+  defp strip_null_arguments(%Swarm.ToolCall{arguments: arguments} = tool_call)
+       when is_binary(arguments) do
+    case Jason.decode(arguments) do
+      {:ok, args} when is_map(args) ->
+        %{tool_call | arguments: Jason.encode!(SchemaTransformer.strip_nulls(args))}
+
+      _ ->
+        tool_call
+    end
+  end
+
+  defp strip_null_arguments(tool_call), do: tool_call
 
   defp parse_arguments(arguments) when is_binary(arguments) do
     case Jason.decode(arguments) do

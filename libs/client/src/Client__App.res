@@ -99,6 +99,7 @@ let make = (~apiBaseUrl: string) => {
   let (showCelebration, setShowCelebration) = React.useState(() => false)
   let (providerNudgeDismissed, setProviderNudgeDismissed) = React.useState(() => false)
   let hasProviderConfigured = Client__State.useSelector(Client__State.Selectors.hasAnyProviderConfigured)
+  let usageInfo = Client__State.useSelector(Client__State.Selectors.usageInfo)
 
   // Trigger post-signup celebration when session becomes active for first time after signup
   React.useEffect2(() => {
@@ -127,9 +128,10 @@ let make = (~apiBaseUrl: string) => {
     openSettingsProviders()
   }
 
-  // Provider nudge: show when FTUE is completed, no provider configured, and not dismissed this session
-  let showProviderNudge = switch (ftueState, hasProviderConfigured, providerNudgeDismissed) {
-  | (Client__FtueState.Completed, false, false) => true
+  // Provider nudge: show when FTUE is completed, no provider configured, and not dismissed this session.
+  // Gate on usageInfo being loaded (Some) to avoid flashing the nudge before provider status is fetched.
+  let showProviderNudge = switch (ftueState, hasProviderConfigured, providerNudgeDismissed, usageInfo) {
+  | (Client__FtueState.Completed, false, false, Some(_)) => true
   | _ => false
   }
 
