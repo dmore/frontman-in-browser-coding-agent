@@ -68,6 +68,8 @@ jobs:
           echo "Bump level: $BUMP"
 
       - name: Run changeset version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: yarn changeset version
 
       - name: Update root CHANGELOG and compute version
