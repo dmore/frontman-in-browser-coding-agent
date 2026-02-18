@@ -160,5 +160,8 @@ type state = {
   chatgptOAuthStatus: chatgptOAuthStatus,
   modelsConfig: option<modelsConfig>,
   selectedModel: option<selectedModel>,
+  // When a provider is freshly connected, this holds its id (e.g. "anthropic")
+  // so the next ModelsConfigReceived auto-selects a default model from it.
+  pendingProviderAutoSelect: option<string>,
   sessionsLoadState: sessionsLoadState,
 }

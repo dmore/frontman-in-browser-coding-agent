@@ -160,6 +160,7 @@ let snapshotToState = (snapshot: Snapshot.t): StateTypes.state => {
     chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
     modelsConfig: None,
     selectedModel: None,
+    pendingProviderAutoSelect: None,
     sessionsLoadState: Client__State__Types.SessionsNotLoaded, // Cannot restore load state from snapshot
   }
 }

@@ -41,6 +41,7 @@ module TestHelpers = {
         chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
         modelsConfig: None,
         selectedModel: None,
+        pendingProviderAutoSelect: None,
         sessionsLoadState: Client__State__Types.SessionsNotLoaded,
       }: Client__State__Types.state
     )
@@ -666,6 +667,7 @@ describe("Client State Reducer - Task Management Actions", () => {
       chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
       modelsConfig: None,
       selectedModel: None,
+      pendingProviderAutoSelect: None,
       sessionsLoadState: Client__State__Types.SessionsNotLoaded,
     }
 
@@ -714,6 +716,7 @@ describe("Client State Reducer - Task Management Actions", () => {
       chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
       modelsConfig: None,
       selectedModel: None,
+      pendingProviderAutoSelect: None,
       sessionsLoadState: Client__State__Types.SessionsNotLoaded,
     }
 
@@ -761,6 +764,7 @@ describe("Client State Reducer - Task Management Actions", () => {
       chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
       modelsConfig: None,
       selectedModel: None,
+      pendingProviderAutoSelect: None,
       sessionsLoadState: Client__State__Types.SessionsNotLoaded,
     }
 
@@ -829,6 +833,7 @@ describe("Client State Reducer - Task Management Actions", () => {
       chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
       modelsConfig: None,
       selectedModel: None,
+      pendingProviderAutoSelect: None,
       sessionsLoadState: Client__State__Types.SessionsNotLoaded,
     }
 
@@ -945,6 +950,7 @@ describe("Client State Reducer - Session Loading Actions", () => {
       chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
       modelsConfig: None,
       selectedModel: None,
+      pendingProviderAutoSelect: None,
       sessionsLoadState: Client__State__Types.SessionsLoading,
     }
 
@@ -1033,6 +1039,7 @@ describe("Client State Reducer - Session Loading Actions", () => {
       chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
       modelsConfig: None,
       selectedModel: None,
+      pendingProviderAutoSelect: None,
       sessionsLoadState: Client__State__Types.SessionsLoaded,
     }
 

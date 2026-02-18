@@ -216,6 +216,7 @@ let defaultState: state = {
   chatgptOAuthStatus: Client__State__Types.ChatGPTNotConnected,
   modelsConfig: None,
   selectedModel: loadSelectedModelFromStorage(), // Load from localStorage on init
+  pendingProviderAutoSelect: None,
   sessionsLoadState: Client__State__Types.SessionsNotLoaded,
 }
 
@@ -1280,6 +1281,7 @@ let next = (state: state, action) => {
         source: UserOverride,
         saveStatus: Saved,
       },
+      pendingProviderAutoSelect: Some("openrouter"),
     }->FrontmanReactStatestore.StateReducer.update(~sideEffects=effects)
 
   | OpenRouterKeySaveError({error}) =>
@@ -1311,24 +1313,51 @@ let next = (state: state, action) => {
     }
 
   | ModelsConfigReceived({config}) =>
-    // Set models config and initialize selected model if not already set
-    let selectedModel = switch state.selectedModel {
-    | Some(model) => Some(model)
+    // When a provider was just connected, auto-select its first model.
+    // Otherwise keep the current selection (or fall back to server default).
+    let (selectedModel, didAutoSelect) = switch state.pendingProviderAutoSelect {
+    | Some(providerId) =>
+      // Find the first model from the newly connected provider
+      let providerModel =
+        config.providers
+        ->Array.find(p => p.id == providerId)
+        ->Option.flatMap(p => p.models->Array.get(0))
+        ->Option.map((m): Client__State__Types.selectedModel => {
+          provider: providerId,
+          value: m.value,
+        })
+      switch providerModel {
+      | Some(model) => (Some(model), true)
+      | None => (state.selectedModel, false)
+      }
     | None =>
-      // Use default model from config
-      Some(
+      switch state.selectedModel {
+      | Some(model) => (Some(model), false)
+      | None =>
+        // Use default model from config
         (
-          {
-            provider: config.defaultModel.provider,
-            value: config.defaultModel.value,
-          }: Client__State__Types.selectedModel
-        ),
-      )
+          Some(
+            (
+              {
+                provider: config.defaultModel.provider,
+                value: config.defaultModel.value,
+              }: Client__State__Types.selectedModel
+            ),
+          ),
+          true,
+        )
+      }
+    }
+    // Persist whenever we picked a new model
+    switch (didAutoSelect, selectedModel) {
+    | (true, Some(model)) => saveSelectedModelToStorage(model)
+    | _ => ()
     }
     {
       ...state,
       modelsConfig: Some(config),
       selectedModel,
+      pendingProviderAutoSelect: None,
     }->FrontmanReactStatestore.StateReducer.update
 
   | SetSelectedModel({model}) =>
@@ -1400,6 +1429,7 @@ let next = (state: state, action) => {
     {
       ...state,
       anthropicOAuthStatus: Client__State__Types.Connected({expiresAt: expiresAtMs}),
+      pendingProviderAutoSelect: Some("anthropic"),
     }->FrontmanReactStatestore.StateReducer.update(~sideEffects=effects)
 
   | AnthropicOAuthError({error}) =>
@@ -1513,6 +1543,7 @@ let next = (state: state, action) => {
       {
         ...state,
         chatgptOAuthStatus: Client__State__Types.ChatGPTConnected({expiresAt: expiresAtMs}),
+        pendingProviderAutoSelect: Some("openai"),
       }->FrontmanReactStatestore.StateReducer.update(~sideEffects=effects)
     | _ => state->FrontmanReactStatestore.StateReducer.update
     }

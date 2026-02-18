@@ -72,6 +72,7 @@ module Fixtures = {
     chatgptOAuthStatus: StateTypes.ChatGPTNotConnected,
     modelsConfig: None,
     selectedModel: None,
+    pendingProviderAutoSelect: None,
     sessionsLoadState: StateTypes.SessionsNotLoaded,
   }
 

@@ -20,6 +20,7 @@ let _makeState = (~chatgptOAuthStatus: Types.chatgptOAuthStatus): Types.state =>
     chatgptOAuthStatus,
     modelsConfig: None,
     selectedModel: None,
+    pendingProviderAutoSelect: None,
     sessionsLoadState: Types.SessionsNotLoaded,
   }
 }
