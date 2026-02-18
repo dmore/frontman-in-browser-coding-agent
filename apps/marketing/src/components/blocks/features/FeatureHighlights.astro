@@ -16,18 +16,21 @@ type FeatureHighlight = {
 	description: string
 	imageAlt: string
 	image?: any
+	gifSrc?: string
 }
 
 const featureHighlights: FeatureHighlight[] = [
 	{
 		title: 'Click any element. Tell it what you want.',
 		description: 'Select a component directly in your browser — a button, a card, an entire section. Describe the change in plain English. No file hunting, no line numbers, no IDE.<br/><br/><span class="pro-tip">Pro tip: use the up and down arrows to move between components and divs</span>',
-		imageAlt: 'Select elements feature demo'
+		imageAlt: 'Select elements feature demo',
+		gifSrc: '/select-element.gif'
 	},
 	{
 		title: 'Watch your code change in real time.',
 		description: 'No more alt-tabbing between editor and browser. Frontman updates your code as you describe changes — and you see the results live, instantly. When you\'re happy, commit and push to Git without ever leaving your browser.',
-		imageAlt: 'Real-time changes feature demo'
+		imageAlt: 'Real-time changes feature demo',
+		gifSrc: '/code-change.gif'
 	},
 	{
 		title: 'Your project rules, loaded automatically.',
@@ -56,20 +59,28 @@ const featureHighlights: FeatureHighlight[] = [
 
 					<!-- Right side: Image/Video placeholder -->
 					<Col spanMobile="12" span="7" classes={`flex items-center ${index === 1 ? 'lg:order-1' : ''}`}>
-						<div class="media-placeholder" role="img" aria-label={feature.imageAlt}>
-							{feature.image ? (
-								<Image
-									src={feature.image}
-									alt={feature.imageAlt}
-									width={620}
-									format="webp"
-									class="media-image"
-								/>
-							) : (
-								<div class="placeholder-content">
-									{/* Image or video will go here */}
-								</div>
-							)}
+					<div class="media-placeholder" role="img" aria-label={feature.imageAlt}>
+						{feature.gifSrc ? (
+							<img
+								src={feature.gifSrc}
+								alt={feature.imageAlt}
+								width={620}
+								class="media-image"
+								loading="lazy"
+							/>
+						) : feature.image ? (
+							<Image
+								src={feature.image}
+								alt={feature.imageAlt}
+								width={620}
+								format="webp"
+								class="media-image"
+							/>
+						) : (
+							<div class="placeholder-content">
+								{/* Image or video will go here */}
+							</div>
+						)}
 						</div>
 					</Col>
 				</Row>
@@ -117,7 +128,6 @@ const featureHighlights: FeatureHighlight[] = [
 		z-index: 10;
 		width: 620px;
 		max-width: 100%;
-		aspect-ratio: 16 / 9;
 	}
 
 	.media-image {
