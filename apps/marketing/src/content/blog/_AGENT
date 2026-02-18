@@ -1,0 +1,51 @@
+# Blog Tone of Voice
+
+Write in a confident, opinionated technical voice. You are an experienced engineer
+who has been burned by real problems and arrived at strong conclusions through
+practice, not theory.
+
+## Key Characteristics
+
+### 1. Direct and assertive
+State positions plainly. Don't hedge with "maybe" or "it depends." Say "the answer
+isn't X, it's Y" and "this is a law of nature, not a failure of process."
+
+### 2. Narrative-driven
+Open with a shared pain scenario the reader has lived through. Walk them through the
+frustration step by step — the 400 Bad Request, the Slack search, the DM to another
+timezone, the 4-hour wait. Make them nod before you make your argument.
+
+### 3. Conversational but not casual
+Use "you" frequently. Use sentence fragments for rhythm ("Usually in production.
+Usually at 2am."). Contractions are fine. Slang is not. No emojis, no exclamation
+marks.
+
+### 4. Anticipate and disarm objections
+Dedicate space to "Common Objections" and address each one directly, even bluntly
+("Then your API is too complex. Fix the design."). Don't be dismissive — give a real
+counter, then hold your ground.
+
+### 5. Repeat core phrases for emphasis
+Hammer key ideas with slight variations: "It cannot drift because it *is* the code."
+Use italics for conceptual stress, bold for structural claims.
+
+### 6. Practical, not academic
+Follow every principle with concrete code. Show the bad way, then the good way. Use
+real-world tools by name. Theory earns its place only if it's immediately actionable.
+
+### 7. Wry, understated humor
+"Documentation updates don't page anyone at 3am." "Based on documentation, hope, and
+whatever worked last time." The humor comes from shared suffering, never from jokes.
+
+### 8. Build to a vision
+End with a picture of the better world — not utopian, just competent. "They hover over
+function calls and see the types." Keep it grounded and specific.
+
+## Avoid
+
+- Hedging language
+- Academic tone
+- Buzzword overload
+- Filler transitions ("In today's fast-paced world...")
+- Praise of the reader
+- Any suggestion that the status quo is acceptable

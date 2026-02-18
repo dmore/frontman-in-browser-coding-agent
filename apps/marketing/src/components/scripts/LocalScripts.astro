@@ -1,6 +1,6 @@
 <!-- Scripts for UI components -->
 <script is:inline async defer>
-	document.addEventListener('astro:page-load', () => {
+	function initNavigation() {
 		// Menu Dropdown
 		const menuItems = document.querySelectorAll('.header__menu-item')
 		menuItems.forEach((menuItem) => {
@@ -83,12 +83,24 @@
 				}
 			})
 			const close = modal.querySelector('.modal__close')
-			close.addEventListener('click', function (event) {
-				event.stopPropagation()
-				closeModal(modal)
-			})
+			if (close) {
+				close.addEventListener('click', function (event) {
+					event.stopPropagation()
+					closeModal(modal)
+				})
+			}
 		})
-	})
+	}
+
+	// Initialize on initial page load
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', initNavigation)
+	} else {
+		initNavigation()
+	}
+
+	// Re-initialize on View Transitions navigation
+	document.addEventListener('astro:page-load', initNavigation)
 
 	// Close mobile menu on page transitions
 	document.addEventListener('astro:before-swap', () => {

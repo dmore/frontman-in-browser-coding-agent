@@ -1,27 +1,63 @@
 ---
-title: 'Welcome to Frontman!'
-pubDate: 2024-04-04T05:00:00Z
-description: "We're excited to introduce you to the ultimate productivity app designed to help you manage your tasks effortlessly to help you stay organized and efficient."
-author: 'Eleni K'
+title: 'Introducing Frontman: AI That Sees Your Browser and Edits Your Frontend'
+pubDate: 2026-02-18T05:00:00Z
+description: 'Frontman is the open-source AI agent that hooks into your framework, sees your live DOM, and edits your actual source code. No guessing, no blind edits.'
+author: 'Frontman Team'
 image: '/blog/post-01-cover.png'
-tags: ['productivity', 'announcement']
+tags: ['announcement', 'open-source']
 ---
 
-Welcome to Frontman! We're excited to introduce you to the ultimate productivity app designed to help you manage your tasks effortlessly. Frontman combines powerful features with an intuitive interface to help you stay organized and efficient.
+You tell Cursor to fix the spacing on your hero section. It reads the file, picks a Tailwind class that looks right, and saves. You switch to the browser. Wrong element. You switch back, add more context — the exact file path, the line number, maybe a hint about the component tree. The agent tries again. You switch to the browser again. Closer. One more round.
 
-![Frontman is here.](/blog/post-01.png)
+Three iterations and six tab switches to change a padding value. Your agent had full access to the source code the entire time. It read every file. It just could not *see* the page.
 
-We have rolled out new security updates to keep your data safe and secure. Learn more about our latest security enhancements and how they protect you.
+![Frontman sees your live UI.](/blog/post-01.png)
 
-Whether you're managing personal tasks, collaborating with a team, or tracking your projects, Frontman has you covered. Our mission is to provide you with the tools you need to succeed.
+### The Problem Is Not the Model
 
-> Frontman combines powerful features with an intuitive interface to help you stay organized and efficient!
+Claude is not stupid. Cursor is not broken. The agent genuinely cannot see what your page looks like. It reads source files. It reads terminal output. It reads build errors. None of that tells it what `p-4 md:p-8` resolves to at your current viewport width, or which of three nested `div`s with padding classes is the one you are staring at in the browser.
 
-### Key Features
+Every coding agent on the market today is *blind to the rendered UI*. They edit files and hope the visual result matches your intent. For backend code, this is fine. For frontend work, hope is not a methodology.
 
-- **In-App Messaging**: Communicate directly within the app using our integrated messaging system.
-- **Project Management**: Organize and manage your projects with ease.
-- **Time Tracking**: Keep track of the time spent on tasks to improve productivity.
-- **Customizable Dashboards**: Tailor your workspace to fit your needs.
+**Other agents guess. Frontman sees.**
 
-Thank you for choosing Frontman. We look forward to helping you achieve your goals!
+Frontman connects to both your dev server *and* your browser. It has direct access to the live DOM, computed styles, your component tree, your routes, and your compilation errors. When you click an element and describe a change, Frontman knows exactly which file and which line to edit — because it can verify the result immediately.
+
+### What That Looks Like
+
+You click a button in the browser. You type "make the font size 18px." This is what happens:
+
+```diff
+// src/components/Hero.tsx
+- <button className="text-sm px-4 py-2 bg-blue-600 text-white rounded">
++ <button className="text-lg px-4 py-2 bg-blue-600 text-white rounded">
+    Get Started
+  </button>
+```
+
+The file saves. Hot-reload fires. The button updates in the browser. One action, one result, zero tab switches. The diff is in your working tree, ready for `git add`.
+
+**Frontman sees.** It does not grep for class names and guess which one to change. It reads the computed `font-size` off the live element, traces it through the component tree to the source file and line, and makes the edit. That is a fundamentally different operation from reading files and inferring what the UI probably looks like.
+
+### Who Actually Needs This
+
+If you have ever burned fifteen minutes of agent context trying to describe which `div` you mean, Frontman is for you. If you have ever reviewed a PR that was one line of CSS wrapped in three days of Jira comments, Frontman is for your team. If you have a designer who files tickets for spacing changes and waits a sprint to see them land, Frontman is for them — they click the element, describe the change, and the source file updates. No IDE. No file paths. No waiting.
+
+### Common Objections
+
+**"My agent can read files and edit them directly. That's basically the same thing."**
+It is not. Your agent reads the *source*. Frontman reads the *rendered output*. The source says `className="p-4 md:p-8 lg:p-12"`. The rendered output says "this element has 32px of padding at the current viewport." The source has three nested divs with padding. The rendered output shows you which one the user is actually pointing at. Your agent is working from a blueprint. Frontman is standing in the room.
+
+**"What about v0 or Bolt? They generate full UIs."**
+They do. From scratch. In a sandbox. Frontman works with *your existing codebase*, your component library, your design tokens, your file conventions. It reads your `agents.md`. It follows your patterns. Generated UIs are demos. Frontman edits production code.
+
+**"AI-generated code changes are risky."**
+Every change Frontman makes is a file edit in your working directory. It shows up in `git diff`. It goes through your normal PR review. If it is wrong, `git checkout` fixes it. This is not riskier than accepting a diff from Cursor or Claude Code — it is the same workflow you already trust.
+
+### The Better World
+
+A designer opens the app in their browser, clicks the hero section, types "reduce the top padding on mobile," and the source file updates. A developer reviews a clean one-line diff in the PR. Nobody filed a ticket. Nobody context-switched. Nobody burned twenty minutes of agent context describing which element they meant.
+
+That is not a fantasy. That is Frontman running on localhost.
+
+**Frontman sees.** [Get started in under 5 minutes](https://frontman.sh). Open source, Apache 2.0, free during beta.
