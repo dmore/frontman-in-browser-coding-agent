@@ -13,7 +13,7 @@ let make = (
   ~todos: array<TodoUtils.todoItem>,
   ~isLoading: bool=false,
   ~messageId as _: string,
-  ~operationLabel: option<string>=?,
+
 ) => {
   // For single todo, show ultra-compact inline format
   let isSingleTodo = Array.length(todos) == 1
@@ -60,16 +60,6 @@ let make = (
       <div className="flex flex-col gap-0.5 p-2">
         {todos->Array.map(todo => renderCompactTodo(todo))->React.array}
       </div>
-    </div>
-  } else if isLoading {
-    let label = operationLabel->Option.getOr("Updating todos...")
-    <div className="flex items-center gap-2 px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded-md my-1 animate-in fade-in duration-100">
-      <span className="flex items-center justify-center w-3 h-3 shrink-0 text-zinc-400">
-        <Icons.LoaderIcon size=12 />
-      </span>
-      <span className="text-xs text-zinc-400 shimmer-text truncate">
-        {React.string(label)}
-      </span>
     </div>
   } else {
     React.null

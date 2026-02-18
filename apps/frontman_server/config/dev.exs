@@ -3,8 +3,6 @@ import Config
 # Mark environment for runtime checks
 config :frontman_server, env: :dev
 
-config :req_llm, receive_timeout: 600_000
-
 # Configure your database
 # For DevPod: post-create.sh updates hostname to the Docker gateway IP
 # For local dev: uses localhost

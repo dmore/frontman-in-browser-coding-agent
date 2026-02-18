@@ -20,6 +20,8 @@ config :frontman_server, :scopes,
     test_setup_helper: :register_and_log_in_user
   ]
 
+config :req_llm, receive_timeout: 150_000
+
 config :frontman_server,
   ecto_repos: [FrontmanServer.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true],

@@ -283,7 +283,7 @@ let make = (
           todos
           isLoading
           messageId
-          operationLabel={TodoUtils.getTodoOperationLabel(tc.toolName, tc.state)}
+
         />
       </React.Fragment>
 

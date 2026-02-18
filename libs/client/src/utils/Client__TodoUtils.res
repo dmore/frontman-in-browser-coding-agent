@@ -122,28 +122,6 @@ let extractTodosFromToolResult = (resultJson: JSON.t): option<array<todoItem>> =
   }
 }
 
-/**
- * Get the appropriate label for a TODO tool operation
- */
-let getTodoOperationLabel = (toolName: string, state: Message.toolCallState): string => {
-  let lowerName = String.toLowerCase(toolName)
-  
-  let (progressive, completed) = if String.includes(lowerName, "read") || String.includes(lowerName, "list") || String.includes(lowerName, "get") {
-    ("Reading todos", "Read todos")
-  } else if String.includes(lowerName, "add") || String.includes(lowerName, "create") {
-    ("Creating todo", "Created todo")
-  } else if String.includes(lowerName, "remove") || String.includes(lowerName, "delete") {
-    ("Removing todo", "Removed todo")
-  } else {
-    ("Updating todos", "Updated todos")
-  }
-  
-  switch state {
-  | InputStreaming | InputAvailable => progressive ++ "..."
-  | OutputAvailable => completed
-  | OutputError => "Failed"
-  }
-}
 
 /**
  * Calculate summary stats for a TODO list
