@@ -51,13 +51,16 @@ runs:
         short_sha="${GITHUB_SHA::7}"
         run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
-        message="${emoji} **${COMPONENT} deployment ${status_text}**
-Repository: \`${GITHUB_REPOSITORY}\`
-Branch: \`${GITHUB_REF_NAME}\`
-Commit: \`${short_sha}\`
-Actor: \`${GITHUB_ACTOR}\`
-Run: ${run_url}"
+        read -r -d '' message <<EOF || true
+${emoji} **${COMPONENT} deployment ${status_text}**
+Repository: ${GITHUB_REPOSITORY}
+Branch: ${GITHUB_REF_NAME}
+Commit: ${short_sha}
+Actor: ${GITHUB_ACTOR}
+Run: ${run_url}
+EOF
 
         curl -fsS -X POST \
-          -F "content=${message}" \
+          -H "Content-Type: application/json" \
+          -d "{\"content\": $(printf '%s' "$message" | jq -Rs .)}" \
           "${DISCORD_WEBHOOK_URL}"
