@@ -3,7 +3,7 @@
 module Bindings = FrontmanBindings
 module Hosts = FrontmanFrontmanCore.FrontmanCore__Hosts
 
-// Default host can be overridden via FRONTMAN_HOST env var for development
+// Default host can be overridden via FRONTMAN_HOST env var for remote development
 let defaultHost = switch Bindings.Process.env->Dict.get("FRONTMAN_HOST") {
 | Some(host) => host
 | None => Hosts.apiHost
