@@ -284,6 +284,33 @@ module NavigateEvent = {
   @get external url: destination => string = "url"
 }
 
+module UrlParsing = {
+  type t
+
+  @new external make: (string, string) => t = "URL"
+  @get external href: t => string = "href"
+  @get external protocol: t => string = "protocol"
+  @get external host: t => string = "host"
+}
+
+let resolveUrlWithBase = (~url: string, ~base: string): option<string> => {
+  try {
+    Some(UrlParsing.make(url, base)->UrlParsing.href)
+  } catch {
+  | _ => None
+  }
+}
+
+let isSameOriginWithBase = (~baseUrl: string, ~targetUrl: string): bool => {
+  try {
+    let base = UrlParsing.make(baseUrl, baseUrl)
+    let target = UrlParsing.make(targetUrl, baseUrl)
+    base->UrlParsing.protocol == target->UrlParsing.protocol && base->UrlParsing.host == target->UrlParsing.host
+  } catch {
+  | _ => false
+  }
+}
+
 let getIframeWindowSafe = (iframe: WebAPI.DOMAPI.element): option<WebAPI.DOMAPI.window> => {
   let iframeElement = iframe->Obj.magic
   try {
@@ -318,7 +345,15 @@ let useIFrameLocation = (~iframeElement: option<WebAPI.DOMAPI.element>, ~attachm
         let onNavigation = (ev: WebAPI.EventAPI.event) => {
           let navigateEvent: NavigateEvent.t = ev->Obj.magic
           let destinationUrl = navigateEvent->NavigateEvent.destination->NavigateEvent.url
-          setLocation(_ => Some(destinationUrl))
+          let currentUrl = iframeWindow->WebAPI.Window.location->WebAPI.Location.href
+          switch resolveUrlWithBase(~url=destinationUrl, ~base=currentUrl) {
+          | None => ()
+          | Some(resolvedDestinationUrl) =>
+            switch isSameOriginWithBase(~baseUrl=currentUrl, ~targetUrl=resolvedDestinationUrl) {
+            | true => setLocation(_ => Some(resolvedDestinationUrl))
+            | false => WebAPI.Event.preventDefault(ev)
+            }
+          }
         }
 
         WebAPI.Navigation.addEventListener(

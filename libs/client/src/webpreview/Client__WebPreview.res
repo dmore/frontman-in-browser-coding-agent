@@ -166,12 +166,19 @@ let make = () => {
   let handleUrlKeyDown = (e: ReactEvent.Keyboard.t) => {
     switch ReactEvent.Keyboard.key(e) {
     | "Enter" =>
-      let url = editableUrl
-      previewFrame.contentWindow->Option.forEach(contentWindow => {
-        contentWindow.location->locationAssign(url)
-      })
-      Client__State.Actions.setPreviewUrl(~url)
-      Client__State.Actions.setSelectedElement(~selectedElement=None)
+      switch Client__Hooks.resolveUrlWithBase(~url=editableUrl, ~base=previewUrl) {
+      | None => ()
+      | Some(resolvedUrl) =>
+        switch Client__Hooks.isSameOriginWithBase(~baseUrl=previewUrl, ~targetUrl=resolvedUrl) {
+        | false => ()
+        | true =>
+          previewFrame.contentWindow->Option.forEach(contentWindow => {
+            contentWindow.location->locationAssign(resolvedUrl)
+          })
+          Client__State.Actions.setPreviewUrl(~url=resolvedUrl)
+          Client__State.Actions.setSelectedElement(~selectedElement=None)
+        }
+      }
       let target: Dom.element = ReactEvent.Keyboard.target(e)->Obj.magic
       target->blur
     | "Escape" =>
