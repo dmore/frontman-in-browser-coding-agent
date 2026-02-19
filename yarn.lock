@@ -2490,7 +2490,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@frontman/bindings@npm:*, @frontman/bindings@npm:0.1.0, @frontman/bindings@workspace:*, @frontman/bindings@workspace:libs/bindings":
+"@frontman/bindings@npm:*, @frontman/bindings@npm:0.1.1, @frontman/bindings@workspace:*, @frontman/bindings@workspace:libs/bindings":
   version: 0.0.0-use.local
   resolution: "@frontman/bindings@workspace:libs/bindings"
   dependencies:
@@ -2632,7 +2632,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@frontman/frontman-core@workspace:libs/frontman-core"
   dependencies:
-    "@frontman/bindings": "npm:0.1.0"
+    "@frontman/bindings": "npm:0.1.1"
     "@frontman/frontman-protocol": "npm:0.2.0"
     "@rescript/runtime": "npm:12.0.0-beta.14"
     "@rescript/webapi": "npm:*"
