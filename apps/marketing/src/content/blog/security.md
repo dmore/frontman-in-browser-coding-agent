@@ -54,7 +54,7 @@ You bring your own API key. You pick your provider:
 - **ChatGPT** via OpenAI
 - **OpenRouter** for access to multiple models
 
-Your key is stored in your browser's local storage. Frontman's server never sees it. The request goes from your browser to the AI provider. Frontman is not in that path. This is the same trust model you already accepted when you pasted your API key into Cursor's settings or configured Claude Code with your Anthropic key.
+Your key is stored securely in Frontman's server database, encrypted at rest. It is never exposed to the browser. The request goes from Frontman's server to the AI provider using your key, and the result is streamed back to your browser. This is the same trust model you already accepted when you pasted your API key into Cursor's settings or configured Claude Code with your Anthropic key.
 
 ### What Can It Not Do?
 
@@ -84,7 +84,7 @@ If you do not trust a claim on this page, read the code. That is the point of op
 Then your code review catches it. The same way it catches a bad suggestion from Copilot that you tab-accepted without reading, or a subtle bug in a Cursor-generated function. Frontman does not bypass your review process. It feeds into it. If you are shipping AI-authored code without review, the agent is not your biggest problem.
 
 **"What about API key security?"**
-Your API key never leaves your browser. It is stored in `localStorage`, sent directly to your chosen AI provider over HTTPS, and never transmitted to Frontman's server. This is the same model as every other developer tool that takes an API key — your Cursor config, your `.env` file, your OpenRouter dashboard. If you clear your browser data, the key is gone.
+Your API key is stored encrypted in Frontman's server database. It never touches your browser. Requests to your chosen AI provider are made server-side over HTTPS, so the key is never exposed in client-side code or network traffic visible to the browser. This is a stronger security posture than storing a key in a `.env` file or your Cursor config.
 
 **"What if it edits the wrong file?"**
 You see the diff immediately. Hot-reload shows you the result in the browser in the same action. If it is wrong, you undo it. This is less risky than a blind agent edit from Cursor, where you accept the change and then have to manually switch to the browser to verify. Frontman shows you the visual result before you decide to keep it.

@@ -45,13 +45,13 @@ The Vite plugin integrates with HMR directly. When Frontman edits a file, hot-mo
 
 ### Connect an AI Provider
 
-Once installed, open your app in the browser and navigate to the Frontman overlay. You need one thing: an API key from the provider you want to use.
+Once installed, open your app in the browser and navigate to the Frontman overlay. Choose the AI provider you want to use:
 
-- **Claude** — Anthropic API key
-- **ChatGPT** — OpenAI API key
+- **Claude** — connect using provider connect
+- **ChatGPT** — connect using provider connect
 - **OpenRouter** — access multiple models with one key
 
-Enter your key in the settings panel. It is stored locally in your browser — Frontman never sends it to any server other than the AI provider you chose. If you already have an API key for any of these providers, setup is done.
+Select your provider in the settings panel and follow the connect flow. If you already have an account with any of these providers, setup is done.
 
 ### What You Can Do Immediately
 
@@ -93,7 +93,7 @@ No. Everything is a project-local dev dependency. No global CLI, no daemon, no b
 
 ### One Command
 
-That is the honest setup. One command to install, one API key to paste, and you are clicking elements in your browser and describing changes in English. The source files update. The browser hot-reloads. The diffs are ready for review.
+That is the honest setup. One command to install, connect your AI provider, and you are clicking elements in your browser and describing changes in English. The source files update. The browser hot-reloads. The diffs are ready for review.
 
 No configuration guide. No "recommended settings." No second blog post explaining why the defaults are wrong. No step seven. It is a dev tool. It runs in dev. You install it in one command and it works.
 
