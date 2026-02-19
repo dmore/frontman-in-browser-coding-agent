@@ -276,94 +276,71 @@ module Scroll = {
   }
 }
 
-// Helper to safely get iframe contentWindow - returns None for cross-origin iframes
-// Cross-origin iframes throw SecurityError when accessing contentWindow properties
-let getIframeWindowSafe: WebAPI.DOMAPI.element => option<WebAPI.DOMAPI.window> = %raw(`
-  function(iframe) {
-    try {
-      var win = iframe.contentWindow;
-      // Verify we have access by reading location (throws if cross-origin)
-      if (win && win.location && win.location.href) {
-        return win;
-      }
-      return undefined;
-    } catch (e) {
-      // Expected for cross-origin iframes - log for debugging
-      console.debug('[useIFrameLocation] Cross-origin iframe access denied:', e.message);
-      return undefined;
-    }
-  }
-`)
+module NavigateEvent = {
+  type destination
+  type t
 
-let useIFrameLocation = (~iframeRef: Nullable.t<WebAPI.DOMAPI.element>) => {
+  @get external destination: t => destination = "destination"
+  @get external url: destination => string = "url"
+}
+
+let getIframeWindowSafe = (iframe: WebAPI.DOMAPI.element): option<WebAPI.DOMAPI.window> => {
+  let iframeElement = iframe->Obj.magic
+  try {
+    switch WebAPI.HTMLIFrameElement.contentWindow(iframeElement)->Null.toOption {
+    | None => None
+    | Some(iframeWindow) =>
+      ignore(iframeWindow->WebAPI.Window.location->WebAPI.Location.href)
+      Some(iframeWindow)
+    }
+  } catch {
+  | _ => None
+  }
+}
+
+let useIFrameLocation = (~iframeElement: option<WebAPI.DOMAPI.element>, ~attachmentKey: int) => {
   let (location, setLocation) = React.useState(() => None)
 
   React.useEffect(() => {
-    let iframeWindow =
-      iframeRef
-      ->Nullable.toOption
-      ->Option.flatMap(iframe => getIframeWindowSafe(iframe))
+    switch iframeElement {
+    | None =>
+      setLocation(_ => None)
+      None
+    | Some(iframe) =>
+      switch getIframeWindowSafe(iframe) {
+      | None =>
+        setLocation(_ => None)
+        None
+      | Some(iframeWindow) =>
+        let initialLocation = Some(iframeWindow->WebAPI.Window.location->WebAPI.Location.href)
+        setLocation(_ => initialLocation)
 
-    switch iframeWindow {
-    | Some(iframeWindow) =>
-      // Get initial location (safe since getIframeWindowSafe verified access)
-      let initialLocation = Some(iframeWindow->WebAPI.Window.location->WebAPI.Location.href)
-      setLocation(_ => initialLocation)
+        let onNavigation = (ev: WebAPI.EventAPI.event) => {
+          let navigateEvent: NavigateEvent.t = ev->Obj.magic
+          let destinationUrl = navigateEvent->NavigateEvent.destination->NavigateEvent.url
+          setLocation(_ => Some(destinationUrl))
+        }
 
-      // Listen for navigation events
-      let onPopState = _ev => {
-        let currentLocation = Some(iframeWindow->WebAPI.Window.location->WebAPI.Location.href)
-        setLocation(_ => currentLocation)
-      }
-      let onNavigation = ev => {
-        let url = ev["destination"]["url"]
-        let currentLocation = Some(url)
-        setLocation(_ => currentLocation)
-      }
-
-      // Check if Navigation API is supported (not available in Firefox/Safari)
-      let navigationSupported = %raw(`typeof iframeWindow.navigation !== 'undefined'`)
-
-      WebAPI.Window.addEventListener(
-        iframeWindow,
-        Custom("popstate"),
-        onPopState,
-        ~options={capture: false},
-      )
-
-      // Only use Navigation API if supported
-      if navigationSupported {
         WebAPI.Navigation.addEventListener(
           iframeWindow.navigation,
           Custom("navigate"),
           onNavigation,
           ~options={capture: false},
         )
-      }
 
-      Some(
-        () => {
-          WebAPI.Window.removeEventListener(
-            iframeWindow,
-            Custom("popstate"),
-            onPopState,
-            ~options={capture: false},
-          )
-
-          // Only remove Navigation API listener if it was added
-          if navigationSupported {
+        Some(
+          () => {
             WebAPI.Navigation.removeEventListener(
               iframeWindow.navigation,
               Custom("navigate"),
               onNavigation,
               ~options={capture: false},
             )
-          }
-        },
-      )
-    | None => None
+          },
+        )
+      }
     }
-  }, (iframeRef, setLocation))
+  }, (iframeElement, attachmentKey))
 
   location
 }
