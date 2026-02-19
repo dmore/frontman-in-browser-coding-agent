@@ -1,5 +1,5 @@
 <!-- Scripts for UI components -->
-<script is:inline async defer>
+<script is:inline>
 	function initNavigation() {
 		// Menu Dropdown
 		const menuItems = document.querySelectorAll('.header__menu-item')
@@ -92,7 +92,10 @@
 		})
 	}
 
-	// astro:page-load fires on both initial page load and View Transitions navigations
+	// Initialize on DOMContentLoaded for initial page load
+	document.addEventListener('DOMContentLoaded', initNavigation)
+
+	// Also handle astro:page-load for View Transitions navigations
 	document.addEventListener('astro:page-load', initNavigation)
 
 	// Close mobile menu on page transitions
