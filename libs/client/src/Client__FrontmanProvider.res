@@ -9,6 +9,13 @@ module Reducer = Client__ConnectionReducer
 module StateReducer = FrontmanReactStatestore.StateReducer
 module RuntimeConfig = Client__RuntimeConfig
 
+// Create the text delta buffer instance and register it as active.
+// The onFlush callback breaks the circular dep: TextDeltaBuffer doesn't import Client__State.
+let textDeltaBuffer = Client__TextDeltaBuffer.make(~onFlush=(~taskId, ~text) => {
+  Client__State.Actions.textDeltaReceived(~taskId, ~text)
+})
+let () = Client__TextDeltaBuffer.active := Some(textDeltaBuffer)
+
 // Re-export status types for consumers
 type connectionState = Reducer.Selectors.connectionStatus
 type mcpState = Reducer.Selectors.mcpStatus
@@ -123,7 +130,10 @@ module Provider = {
 
       dispatch(Initialize({config, relay, mcpServer}))
 
-      Some(() => dispatch(Cleanup))
+      Some(() => {
+        textDeltaBuffer.reset()
+        dispatch(Cleanup)
+      })
     })
 
     let handleSessionUpdate = React.useCallback0((sessionId: string, update: Types.sessionUpdate) => {
@@ -132,8 +142,10 @@ module Provider = {
       | AgentMessageChunk({content}) =>
         // Per ACP spec: first agent_message_chunk implicitly signals message start.
         // Message end is signaled by session/prompt response with stopReason.
+        // Buffer text deltas and flush once per animation frame to avoid
+        // dozens of full state rebuilds per second during fast streaming.
         content->Option.flatMap(c => c.text)->Option.forEach(text => {
-          Client__State.Actions.textDeltaReceived(~taskId, ~text)
+          textDeltaBuffer.add(~taskId, ~text)
         })
       | UserMessageChunk({content, timestamp}) =>
         content.text->Option.forEach(text => {

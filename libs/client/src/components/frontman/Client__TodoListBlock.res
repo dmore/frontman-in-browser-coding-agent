@@ -13,7 +13,6 @@ let make = (
   ~todos: array<TodoUtils.todoItem>,
   ~isLoading: bool=false,
   ~messageId as _: string,
-
 ) => {
   // For single todo, show ultra-compact inline format
   let isSingleTodo = Array.length(todos) == 1

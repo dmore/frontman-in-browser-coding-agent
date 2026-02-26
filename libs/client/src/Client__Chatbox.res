@@ -205,8 +205,37 @@ let make = (
     }
   }
 
-  // Group messages for display
-  let displayItems = React.useMemo1(() => groupMessages(messages), [messages])
+  // Group messages for display, with referential stability for tool groups.
+  // MessageStore.update does a shallow Array.copy, so unchanged toolCall records
+  // keep the same reference. We cache previous groups by ID and reuse them when
+  // all constituent tool calls are reference-equal — this lets React skip
+  // re-rendering groups that haven't actually changed during streaming.
+  let groupCacheRef: React.ref<Dict.t<ToolGroupTypes.toolGroup>> = React.useRef(Dict.make())
+  let displayItems = React.useMemo1(() => {
+    let items = groupMessages(messages)
+    let prevCache = groupCacheRef.current
+    let newCache = Dict.make()
+
+    let stableItems = items->Array.map(item => {
+      switch item {
+      | ToolGroup(group, idx) =>
+        let stableGroup: ToolGroupTypes.toolGroup = switch prevCache->Dict.get(group.id) {
+        | Some(prev)
+          if Array.length(prev.toolCalls) == Array.length(group.toolCalls) &&
+            prev.toolCalls->Array.everyWithIndex((prevTc, i) => {
+              prevTc === group.toolCalls->Array.getUnsafe(i)
+            }) => prev
+        | _ => group
+        }
+        newCache->Dict.set(stableGroup.id, stableGroup)
+        ToolGroup(stableGroup, idx)
+      | other => other
+      }
+    })
+
+    groupCacheRef.current = newCache
+    stableItems
+  }, [messages])
   let totalItems = Array.length(displayItems)
 
   // Find the index of the last ToolGroup in displayItems
@@ -304,7 +333,6 @@ let make = (
     | TodoToolCall(tc, _) =>
       // Use stable tool call ID for key
       let messageId = `todo-${tc.id}`
-      // Extract TODOs from input first (for todo_write), then result
       let todos = TodoUtils.extractTodos(~input=tc.input, ~result=tc.result)
       let isLoading = switch tc.state {
       | InputStreaming | InputAvailable => true
@@ -316,7 +344,6 @@ let make = (
           todos
           isLoading
           messageId
-
         />
       </div>
 
