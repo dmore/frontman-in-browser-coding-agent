@@ -79,6 +79,254 @@ defmodule FrontmanServer.Tasks.Interaction do
       # True if node contains DSL text, false if it contains full JSON data
       field(:is_dsl, boolean(), default: true)
     end
+
+    @spec from_map(map() | nil) :: t() | nil
+    def from_map(nil), do: nil
+
+    def from_map(data) when is_map(data) do
+      %__MODULE__{
+        id: data["id"],
+        node: data["node"],
+        image: data["image"],
+        is_dsl: data["is_dsl"] || true
+      }
+    end
+  end
+
+  defmodule Screenshot do
+    @moduledoc """
+    Base64-encoded screenshot with MIME type.
+    """
+    use TypedStruct
+
+    @derive Jason.Encoder
+    typedstruct enforce: true do
+      field(:blob, String.t())
+      field(:mime_type, String.t())
+    end
+
+    @spec from_map(map() | nil) :: t() | nil
+    def from_map(nil), do: nil
+
+    def from_map(%{blob: blob, mime_type: mime_type})
+        when is_binary(blob) and is_binary(mime_type),
+        do: %__MODULE__{blob: blob, mime_type: mime_type}
+
+    def from_map(%{"blob" => blob, "mime_type" => mime_type})
+        when is_binary(blob) and is_binary(mime_type),
+        do: %__MODULE__{blob: blob, mime_type: mime_type}
+
+    def from_map(_), do: nil
+  end
+
+  defmodule BoundingBox do
+    @moduledoc """
+    Bounding box of an element in viewport coordinates.
+    """
+    use TypedStruct
+
+    @derive Jason.Encoder
+    typedstruct enforce: true do
+      field(:x, float())
+      field(:y, float())
+      field(:width, float())
+      field(:height, float())
+    end
+
+    @spec from_map(map() | nil) :: t() | nil
+    def from_map(nil), do: nil
+
+    def from_map(%{x: x, y: y, width: w, height: h})
+        when is_number(x) and is_number(y) and is_number(w) and is_number(h),
+        do: %__MODULE__{x: x / 1, y: y / 1, width: w / 1, height: h / 1}
+
+    def from_map(%{"x" => x, "y" => y, "width" => w, "height" => h})
+        when is_number(x) and is_number(y) and is_number(w) and is_number(h),
+        do: %__MODULE__{x: x / 1, y: y / 1, width: w / 1, height: h / 1}
+
+    def from_map(_), do: nil
+  end
+
+  defmodule ParentLocation do
+    @moduledoc """
+    Source location of a parent component in the React tree.
+
+    Forms a recursive chain via the `parent` field.
+    """
+    use TypedStruct
+
+    @derive Jason.Encoder
+    typedstruct enforce: true do
+      field(:file, String.t())
+      field(:line, integer())
+      field(:column, integer())
+      field(:component_name, String.t() | nil, enforce: false)
+      field(:component_props, map() | nil, enforce: false)
+      field(:parent, t() | nil, enforce: false)
+    end
+
+    alias FrontmanServer.Tasks.Interaction
+
+    @spec from_map(map() | nil) :: t() | nil
+    def from_map(nil), do: nil
+
+    def from_map(data) when is_map(data) do
+      file = Interaction.get_flex(data, "file")
+      line = Interaction.get_flex(data, "line")
+      column = Interaction.get_flex(data, "column")
+
+      if is_binary(file) and is_integer(line) and is_integer(column) do
+        %__MODULE__{
+          file: file,
+          line: line,
+          column: column,
+          component_name: Interaction.get_flex(data, "component_name"),
+          component_props: Interaction.get_flex(data, "component_props"),
+          parent: from_map(Interaction.get_flex(data, "parent"))
+        }
+      else
+        nil
+      end
+    end
+
+    def from_map(_), do: nil
+  end
+
+  defmodule UserImage do
+    @moduledoc """
+    A user-uploaded image or PDF attachment.
+    """
+    use TypedStruct
+
+    @derive Jason.Encoder
+    typedstruct enforce: true do
+      field(:blob, String.t())
+      field(:mime_type, String.t())
+      field(:filename, String.t())
+      field(:uri, String.t() | nil, enforce: false)
+    end
+
+    @spec from_map(map()) :: t()
+    def from_map(data) when is_map(data) do
+      %__MODULE__{
+        blob: data["blob"],
+        mime_type: data["mime_type"] || "image/png",
+        filename: data["filename"] || "attachment",
+        uri: data["uri"]
+      }
+    end
+  end
+
+  defmodule CurrentPage do
+    @moduledoc """
+    Page context from the client: URL, viewport, DPR, title, color scheme, scroll position.
+    """
+    use TypedStruct
+
+    @derive Jason.Encoder
+    typedstruct enforce: true do
+      field(:url, String.t())
+      field(:viewport_width, integer() | nil, enforce: false)
+      field(:viewport_height, integer() | nil, enforce: false)
+      field(:device_pixel_ratio, float() | nil, enforce: false)
+      field(:title, String.t() | nil, enforce: false)
+      field(:color_scheme, String.t() | nil, enforce: false)
+      field(:scroll_y, integer() | nil, enforce: false)
+    end
+
+    @spec from_map(map() | nil) :: t() | nil
+    def from_map(nil), do: nil
+
+    def from_map(data) when is_map(data) do
+      url = data["url"]
+
+      case url do
+        url when is_binary(url) ->
+          %__MODULE__{
+            url: url,
+            viewport_width: data["viewport_width"],
+            viewport_height: data["viewport_height"],
+            device_pixel_ratio: data["device_pixel_ratio"],
+            title: data["title"],
+            color_scheme: data["color_scheme"],
+            scroll_y: data["scroll_y"]
+          }
+
+        _ ->
+          nil
+      end
+    end
+
+    def from_map(_), do: nil
+  end
+
+  defmodule Annotation do
+    @moduledoc """
+    Represents a single annotated element from the client.
+
+    Contains source location, screenshot, and enrichment data.
+    """
+    use TypedStruct
+
+    @derive Jason.Encoder
+    typedstruct do
+      field(:annotation_id, String.t())
+      field(:annotation_index, integer())
+      field(:tag_name, String.t())
+      field(:comment, String.t() | nil)
+      field(:file, String.t() | nil)
+      field(:line, integer() | nil)
+      field(:column, integer() | nil)
+      field(:component_name, String.t() | nil)
+      field(:component_props, map() | nil)
+      field(:parent, ParentLocation.t() | nil)
+      field(:css_classes, String.t() | nil)
+      field(:nearby_text, String.t() | nil)
+      field(:bounding_box, BoundingBox.t() | nil)
+      field(:screenshot, Screenshot.t() | nil)
+    end
+
+    alias FrontmanServer.Tasks.Interaction
+
+    @doc """
+    Builds an Annotation from a map with string or atom keys.
+
+    Used by both DB deserialization (InteractionSchema.to_struct) and
+    ACP content block parsing (via from_meta/2).
+    """
+    @spec from_map(map()) :: t()
+    def from_map(data) when is_map(data) do
+      %__MODULE__{
+        annotation_id: Interaction.get_flex(data, "annotation_id"),
+        annotation_index: Interaction.get_flex(data, "annotation_index"),
+        tag_name: Interaction.get_flex(data, "tag_name") || "unknown",
+        comment: Interaction.get_flex(data, "comment"),
+        file: Interaction.get_flex(data, "file"),
+        line: Interaction.get_flex(data, "line"),
+        column: Interaction.get_flex(data, "column"),
+        component_name: Interaction.get_flex(data, "component_name"),
+        component_props: Interaction.get_flex(data, "component_props"),
+        parent: ParentLocation.from_map(Interaction.get_flex(data, "parent")),
+        css_classes: Interaction.get_flex(data, "css_classes"),
+        nearby_text: Interaction.get_flex(data, "nearby_text"),
+        bounding_box: BoundingBox.from_map(Interaction.get_flex(data, "bounding_box")),
+        screenshot: Screenshot.from_map(Interaction.get_flex(data, "screenshot"))
+      }
+    end
+
+    @doc """
+    Builds an Annotation from an ACP `_meta` block, pairing with a separate
+    screenshot map keyed by annotation_id.
+
+    The _meta block contains all annotation fields inline. Screenshots are
+    sent as separate content blocks and collected into `screenshot_map` by
+    the caller.
+    """
+    @spec from_meta(map(), %{optional(String.t()) => Screenshot.t()}) :: t()
+    def from_meta(meta, screenshot_map \\ %{}) when is_map(meta) do
+      ann = from_map(meta)
+      %{ann | screenshot: Map.get(screenshot_map, ann.annotation_id)}
+    end
   end
 
   defmodule UserMessage do
@@ -87,32 +335,10 @@ defmodule FrontmanServer.Tasks.Interaction do
 
     All fields are extracted from content blocks at creation time:
     - `messages` - array of text messages from the user
-    - `selected_component` - source location of selected element
-    - `selected_component_screenshot` - screenshot of selected element
+    - `annotations` - list of annotated elements (replaces selected_component)
     - `current_page` - page context (URL, viewport, DPR, title, color scheme, scroll)
     """
     use TypedStruct
-
-    @type selected_component :: %{
-            file: String.t(),
-            line: integer(),
-            column: integer(),
-            source_snippet: String.t() | nil,
-            source_type: String.t() | nil,
-            component_name: String.t() | nil,
-            component_props: map() | nil,
-            parent: selected_component() | nil
-          }
-
-    @type current_page :: %{
-            url: String.t(),
-            viewport_width: integer() | nil,
-            viewport_height: integer() | nil,
-            device_pixel_ratio: float() | nil,
-            title: String.t() | nil,
-            color_scheme: String.t() | nil,
-            scroll_y: integer() | nil
-          }
 
     typedstruct enforce: true do
       field(:id, String.t())
@@ -120,24 +346,19 @@ defmodule FrontmanServer.Tasks.Interaction do
       field(:timestamp, DateTime.t())
       # Text messages from the user (extracted from text content blocks)
       field(:messages, list(String.t()), default: [])
-      # Extracted source location from resource with _meta.selected_component
-      field(:selected_component, selected_component() | nil, enforce: false)
 
-      # Extracted screenshot from resource with _meta.selected_component_screenshot
-      # Contains %{blob: base64_data, mime_type: "image/jpeg" | "image/png"}
-      field(:selected_component_screenshot, %{blob: String.t(), mime_type: String.t()} | nil,
-        enforce: false
-      )
+      # Annotated elements extracted from resource blocks with _meta.annotation: true
+      # Each annotation contains source location, screenshot, and enrichment data
+      field(:annotations, list(Annotation.t()), default: [])
 
       # Extracted Figma node with id, node data (DSL or full JSON), and image
       field(:selected_figma_node, FigmaNode.t() | nil, enforce: false)
 
       # User-uploaded image/PDF attachments
-      # Each entry: %{blob: base64_data, mime_type: "image/png", filename: "image.png"}
-      field(:images, list(map()), default: [])
+      field(:images, list(UserImage.t()), default: [])
 
       # Extracted current page context from resource with _meta.current_page
-      field(:current_page, current_page() | nil, enforce: false)
+      field(:current_page, CurrentPage.t() | nil, enforce: false)
     end
 
     def new(content_blocks) do
@@ -148,8 +369,7 @@ defmodule FrontmanServer.Tasks.Interaction do
         sequence: Interaction.new_sequence(),
         timestamp: Interaction.now(),
         messages: extract_messages(content_blocks),
-        selected_component: extract_selected_component(content_blocks),
-        selected_component_screenshot: extract_selected_component_screenshot(content_blocks),
+        annotations: extract_annotations(content_blocks),
         selected_figma_node: extract_selected_figma_node(content_blocks),
         images: extract_user_images(content_blocks),
         current_page: extract_current_page(content_blocks)
@@ -164,94 +384,54 @@ defmodule FrontmanServer.Tasks.Interaction do
       |> Enum.reject(&(&1 == ""))
     end
 
-    # Extract selected component from content blocks
-    # Looks for _meta.selected_component with structured data
-    defp extract_selected_component(content_blocks) do
-      Enum.find_value(content_blocks, fn
-        %{
-          "type" => "resource",
-          "resource" => %{"_meta" => %{"selected_component" => true} = meta}
-        } ->
-          file = Map.get(meta, "file")
-          line = Map.get(meta, "line")
-          column = Map.get(meta, "column")
+    # Extract annotations from content blocks.
+    # Annotations are resource blocks with _meta.annotation: true.
+    # Screenshots are paired by annotation_id via _meta.annotation_screenshot: true.
+    defp extract_annotations(content_blocks) do
+      screenshot_map = extract_screenshot_map(content_blocks)
 
-          if is_binary(file) and is_integer(line) and is_integer(column) do
-            %{
-              file: file,
-              line: line,
-              column: column,
-              source_snippet: Map.get(meta, "source_snippet"),
-              source_type: Map.get(meta, "source_type"),
-              component_name: Map.get(meta, "component_name"),
-              component_props: Map.get(meta, "component_props"),
-              parent: parse_parent_chain(Map.get(meta, "parent"))
-            }
-          else
-            nil
-          end
-
-        _ ->
-          nil
-      end)
-    end
-
-    # Recursively parse parent chain from _meta
-    defp parse_parent_chain(nil), do: nil
-
-    defp parse_parent_chain(parent) when is_map(parent) do
-      file = Map.get(parent, "file")
-      line = Map.get(parent, "line")
-      column = Map.get(parent, "column")
-
-      if is_binary(file) and is_integer(line) and is_integer(column) do
-        %{
-          file: file,
-          line: line,
-          column: column,
-          source_snippet: nil,
-          source_type: nil,
-          component_name: Map.get(parent, "component_name"),
-          component_props: Map.get(parent, "component_props"),
-          parent: parse_parent_chain(Map.get(parent, "parent"))
-        }
-      else
-        nil
-      end
-    end
-
-    defp parse_parent_chain(_), do: nil
-
-    # Extract selected component screenshot from content blocks
-    # Looks for _meta.selected_component_screenshot with blob data and mimeType
-    defp extract_selected_component_screenshot(content_blocks) do
       content_blocks
-      |> Enum.find_value(fn
-        %{"type" => "resource", "resource" => resource} ->
-          case resource do
-            %{
-              "_meta" => %{"selected_component_screenshot" => true},
-              "resource" => %{"blob" => blob, "mimeType" => mime_type}
-            }
-            when is_binary(blob) and is_binary(mime_type) ->
-              %{blob: blob, mime_type: mime_type}
+      |> Enum.filter(&annotation_block?/1)
+      |> Enum.map(fn %{"type" => "resource", "resource" => %{"_meta" => meta}} ->
+        Annotation.from_meta(meta, screenshot_map)
+      end)
+      |> Enum.sort_by(& &1.annotation_index)
+    end
 
-            # Fallback for legacy data without mimeType - default to image/jpeg
-            %{
-              "_meta" => %{"selected_component_screenshot" => true},
-              "resource" => %{"blob" => blob}
-            }
-            when is_binary(blob) ->
-              %{blob: blob, mime_type: "image/jpeg"}
+    defp annotation_block?(%{
+           "type" => "resource",
+           "resource" => %{"_meta" => %{"annotation" => true}}
+         }), do: true
 
-            _ ->
-              nil
-          end
+    defp annotation_block?(_), do: false
 
-        _ ->
-          nil
+    # Collect screenshot blobs indexed by annotation_id
+    defp extract_screenshot_map(content_blocks) do
+      content_blocks
+      |> Enum.filter(&annotation_screenshot_block?/1)
+      |> Enum.reduce(%{}, fn %{"type" => "resource", "resource" => resource}, acc ->
+        annotation_id = get_in(resource, ["_meta", "annotation_id"])
+        inner = Map.get(resource, "resource", %{})
+
+        case Screenshot.from_map(%{
+               "blob" => inner["blob"],
+               "mime_type" => inner["mimeType"] || "image/jpeg"
+             }) do
+          %Screenshot{} = screenshot when is_binary(annotation_id) ->
+            Map.put(acc, annotation_id, screenshot)
+
+          _ ->
+            acc
+        end
       end)
     end
+
+    defp annotation_screenshot_block?(%{
+           "type" => "resource",
+           "resource" => %{"_meta" => %{"annotation_screenshot" => true}}
+         }), do: true
+
+    defp annotation_screenshot_block?(_), do: false
 
     defp extract_selected_figma_node(content_blocks) do
       Enum.find_value(content_blocks, fn
@@ -295,57 +475,44 @@ defmodule FrontmanServer.Tasks.Interaction do
       end)
     end
 
-    # Extract current page context from content blocks
-    # Looks for _meta.current_page with page metadata
+    # Extract current page context from content blocks.
+    # Delegates construction to CurrentPage.from_map/1.
     defp extract_current_page(content_blocks) do
       Enum.find_value(content_blocks, fn
-        %{
-          "type" => "resource",
-          "resource" => %{"_meta" => %{"current_page" => true} = meta}
-        } ->
-          url = Map.get(meta, "url")
-
-          case url do
-            url when is_binary(url) ->
-              %{
-                url: url,
-                viewport_width: Map.get(meta, "viewport_width"),
-                viewport_height: Map.get(meta, "viewport_height"),
-                device_pixel_ratio: Map.get(meta, "device_pixel_ratio"),
-                title: Map.get(meta, "title"),
-                color_scheme: Map.get(meta, "color_scheme"),
-                scroll_y: Map.get(meta, "scroll_y")
-              }
-
-            _ ->
-              nil
-          end
+        %{"type" => "resource", "resource" => %{"_meta" => %{"current_page" => true} = meta}} ->
+          CurrentPage.from_map(meta)
 
         _ ->
           nil
       end)
     end
 
-    # Extract user-uploaded images from content blocks
-    # Looks for resource blocks with _meta.user_image: true
+    # Extract user-uploaded images from content blocks.
+    # Merges _meta and inner resource fields, then delegates to UserImage.from_map/1.
     defp extract_user_images(content_blocks) do
       content_blocks
-      |> Enum.filter(fn
-        %{"type" => "resource", "resource" => %{"_meta" => %{"user_image" => true}}} -> true
-        _ -> false
-      end)
+      |> Enum.filter(&user_image_block?/1)
       |> Enum.map(fn %{"type" => "resource", "resource" => resource} ->
         inner = Map.get(resource, "resource", %{})
         meta = Map.get(resource, "_meta", %{})
 
-        %{
-          blob: Map.get(inner, "blob", ""),
-          mime_type: Map.get(inner, "mimeType", "image/png"),
-          filename: Map.get(meta, "filename", "attachment"),
-          uri: Map.get(inner, "uri")
-        }
+        # UserImage fields come from both _meta (filename) and inner resource (blob, mimeType, uri).
+        # Merge into a flat map with the keys UserImage.from_map expects.
+        UserImage.from_map(%{
+          "blob" => inner["blob"] || "",
+          "mime_type" => inner["mimeType"] || "image/png",
+          "filename" => meta["filename"] || "attachment",
+          "uri" => inner["uri"]
+        })
       end)
     end
+
+    defp user_image_block?(%{
+           "type" => "resource",
+           "resource" => %{"_meta" => %{"user_image" => true}}
+         }), do: true
+
+    defp user_image_block?(_), do: false
   end
 
   defimpl Jason.Encoder, for: UserMessage do
@@ -364,14 +531,38 @@ defmodule FrontmanServer.Tasks.Interaction do
             }
         end
 
+      annotations =
+        Enum.map(value.annotations, fn ann ->
+          base = %{
+            annotation_id: ann.annotation_id,
+            annotation_index: ann.annotation_index,
+            tag_name: ann.tag_name,
+            comment: ann.comment,
+            file: ann.file,
+            line: ann.line,
+            column: ann.column,
+            component_name: ann.component_name,
+            component_props: ann.component_props,
+            parent: ann.parent,
+            css_classes: ann.css_classes,
+            nearby_text: ann.nearby_text,
+            bounding_box: ann.bounding_box,
+            screenshot: ann.screenshot
+          }
+
+          # Strip nil values to keep JSON compact
+          base
+          |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+          |> Map.new()
+        end)
+
       Jason.Encode.map(
         %{
           type: "user_message",
           id: value.id,
           messages: value.messages,
           timestamp: DateTime.to_iso8601(value.timestamp),
-          selected_component: value.selected_component,
-          selected_component_screenshot: value.selected_component_screenshot != nil,
+          annotations: annotations,
           selected_figma_node: selected_figma_node,
           images:
             Enum.map(value.images, fn img ->
@@ -680,6 +871,19 @@ defmodule FrontmanServer.Tasks.Interaction do
   end
 
   @doc """
+  Retrieves a value from a map supporting both string and atom keys.
+
+  Useful at persistence boundaries where DB JSON comes with string keys
+  but in-memory structs use atoms.
+  """
+  @spec get_flex(map(), String.t()) :: term()
+  def get_flex(map, key) when is_binary(key) do
+    Map.get(map, key) || Map.get(map, String.to_existing_atom(key))
+  rescue
+    ArgumentError -> Map.get(map, key)
+  end
+
+  @doc """
   Generates a new interaction ID (UUID v4).
   """
   def new_id do
@@ -831,13 +1035,13 @@ defmodule FrontmanServer.Tasks.Interaction do
       msg.messages
       |> Enum.join("\n\n")
       |> append_current_page_context(msg.current_page)
-      |> append_component_location(msg.selected_component)
+      |> append_annotations(msg.annotations)
       |> append_image_attachment_context(msg.images)
 
     content_parts =
       text_content
       |> build_text_parts()
-      |> append_screenshot(msg.selected_component_screenshot)
+      |> append_annotation_screenshots(msg.annotations)
       |> append_user_images(msg.images)
 
     build_user_message(content_parts)
@@ -872,28 +1076,99 @@ defmodule FrontmanServer.Tasks.Interaction do
 
   # Helper functions for to_llm_message(%UserMessage{})
 
-  defp append_component_location(text, %{file: file, line: line, column: column} = sc) do
-    source_context = build_source_context(sc)
-    component_name_context = build_component_name_context(sc)
-    props_context = build_props_context(sc)
-    parent_context = build_parent_context(sc)
+  # Append annotation location info to user message text
+  defp append_annotations(text, []), do: text
 
-    location_info = """
+  defp append_annotations(text, annotations) when is_list(annotations) do
+    annotation_sections =
+      annotations
+      |> Enum.with_index()
+      |> Enum.map_join("\n", fn {ann, idx} -> format_annotation(ann, idx) end)
 
-    [Selected Component Location]
-    File: #{file}
-    Line: #{line}
-    Column: #{column}#{component_name_context}#{source_context}#{props_context}#{parent_context}
+    text <>
+      """
 
-    IMPORTANT: The user has selected a specific component at this location.
-    Start by reading this exact file and making changes at or near the specified line.
-    Do NOT explore or search for files - go directly to the selected file.
-    """
-
-    text <> location_info
+      [Annotated Elements]
+      #{annotation_sections}
+      IMPORTANT: The user has annotated specific element(s) in their application.
+      Start by reading the exact file(s) and making changes at or near the specified line(s).
+      Do NOT explore or search for files - go directly to the annotated file(s).
+      """
   end
 
-  defp append_component_location(text, _), do: text
+  defp format_annotation(ann, idx) do
+    location = format_annotation_location(ann)
+    optional_parts = format_annotation_optional_parts(ann)
+
+    """
+    Annotation #{idx + 1}:
+      Tag: <#{ann.tag_name}>
+      #{location}#{optional_parts}
+    """
+  end
+
+  defp format_annotation_location(%{file: file, line: line, column: column})
+       when is_binary(file) and is_integer(line) do
+    "File: #{file}\n  Line: #{line}\n  Column: #{column || 0}"
+  end
+
+  defp format_annotation_location(%{tag_name: tag_name}), do: "Element: <#{tag_name}>"
+
+  defp format_annotation_optional_parts(ann) do
+    [
+      annotation_string_field(ann.component_name, "Component"),
+      annotation_string_field(ann.comment, "Comment"),
+      annotation_string_field(ann.css_classes, "CSS Classes"),
+      annotation_string_field(ann.nearby_text, "Nearby Text"),
+      annotation_bbox_field(ann.bounding_box),
+      annotation_props_field(ann.component_props),
+      annotation_parent_field(ann.parent)
+    ]
+    |> Enum.join()
+  end
+
+  defp annotation_string_field(value, label) when is_binary(value), do: "\n  #{label}: #{value}"
+  defp annotation_string_field(_, _), do: ""
+
+  defp annotation_bbox_field(%{x: x, y: y, width: w, height: h}),
+    do: "\n  Bounding Box: {x: #{x}, y: #{y}, width: #{w}, height: #{h}}"
+
+  defp annotation_bbox_field(_), do: ""
+
+  defp annotation_props_field(props) when is_map(props) and map_size(props) > 0,
+    do: "\n  Props: #{Jason.encode!(props, pretty: false)}"
+
+  defp annotation_props_field(_), do: ""
+
+  defp annotation_parent_field(nil), do: ""
+  defp annotation_parent_field(parent), do: "\n  Parent: #{format_parent_chain(parent, 1)}"
+
+  defp format_parent_chain(nil, _depth), do: ""
+
+  defp format_parent_chain(%{file: file, line: line, column: column} = parent, depth) do
+    component_name = Map.get(parent, :component_name)
+    props = Map.get(parent, :component_props)
+    nested_parent = Map.get(parent, :parent)
+
+    indent = String.duplicate("  ", depth - 1)
+    name_part = if component_name, do: " (#{component_name})", else: ""
+    location = "#{indent}#{depth}. #{file}:#{line}:#{column}#{name_part}"
+
+    props_part =
+      if is_map(props) and map_size(props) > 0 do
+        props_json = Jason.encode!(props, pretty: false)
+        "\n#{indent}   Props: #{props_json}"
+      else
+        ""
+      end
+
+    nested_part = format_parent_chain(nested_parent, depth + 1)
+    nested_separator = if nested_part != "", do: "\n", else: ""
+
+    location <> props_part <> nested_separator <> nested_part
+  end
+
+  defp format_parent_chain(_, _depth), do: ""
 
   # Append current page context to user message text
   defp append_current_page_context(text, %{url: url} = page) do
@@ -972,119 +1247,26 @@ defmodule FrontmanServer.Tasks.Interaction do
 
   defp build_scroll_context(_), do: ""
 
-  defp build_component_name_context(%{component_name: name}) when is_binary(name) do
-    "\nComponent: #{name}"
-  end
-
-  defp build_component_name_context(_), do: ""
-
-  defp build_props_context(%{component_props: props})
-       when is_map(props) and map_size(props) > 0 do
-    props_json = Jason.encode!(props, pretty: true)
-
-    """
-
-    Component Props:
-    ```json
-    #{props_json}
-    ```
-    """
-  end
-
-  defp build_props_context(_), do: ""
-
-  defp build_parent_context(%{parent: parent}) when not is_nil(parent) do
-    parent_chain = format_parent_chain(parent, 1)
-
-    """
-
-    Parent Component Hierarchy:
-    #{parent_chain}
-    """
-  end
-
-  defp build_parent_context(_), do: ""
-
-  defp format_parent_chain(nil, _depth), do: ""
-
-  defp format_parent_chain(%{file: file, line: line, column: column} = parent, depth) do
-    component_name = Map.get(parent, :component_name)
-    props = Map.get(parent, :component_props)
-    nested_parent = Map.get(parent, :parent)
-
-    indent = String.duplicate("  ", depth - 1)
-    name_part = if component_name, do: " (#{component_name})", else: ""
-    location = "#{indent}#{depth}. #{file}:#{line}:#{column}#{name_part}"
-
-    props_part =
-      if is_map(props) and map_size(props) > 0 do
-        props_json = Jason.encode!(props, pretty: false)
-        "\n#{indent}   Props: #{props_json}"
-      else
-        ""
-      end
-
-    nested_part = format_parent_chain(nested_parent, depth + 1)
-    nested_separator = if nested_part != "", do: "\n", else: ""
-
-    location <> props_part <> nested_separator <> nested_part
-  end
-
-  defp format_parent_chain(_, _depth), do: ""
-
-  defp build_source_context(sc) do
-    case {Map.get(sc, :source_snippet), Map.get(sc, :source_type)} do
-      {nil, nil} ->
-        ""
-
-      {snippet, nil} when is_binary(snippet) ->
-        """
-
-        Source Context:
-        ```
-        #{snippet}
-        ```
-        """
-
-      {nil, source_type} when is_binary(source_type) ->
-        """
-
-        Source Type: #{source_type}
-        """
-
-      {snippet, source_type} when is_binary(snippet) and is_binary(source_type) ->
-        """
-
-        Source Type: #{source_type}
-        Source Context:
-        ```
-        #{snippet}
-        ```
-        """
-
-      _ ->
-        ""
-    end
-  end
-
   defp build_text_parts(""), do: []
   defp build_text_parts(text), do: [ContentPart.text(text)]
 
-  defp append_screenshot(parts, nil), do: parts
+  # Append annotation screenshots as image content parts
+  defp append_annotation_screenshots(parts, []), do: parts
 
-  defp append_screenshot(parts, %{blob: base64_data, mime_type: mime_type}) do
-    case Base.decode64(base64_data) do
-      {:ok, decoded_data} -> parts ++ [ContentPart.image(decoded_data, mime_type)]
-      :error -> parts
-    end
-  end
+  defp append_annotation_screenshots(parts, annotations) when is_list(annotations) do
+    screenshot_parts =
+      annotations
+      |> Enum.filter(&(&1.screenshot != nil))
+      |> Enum.flat_map(fn ann ->
+        %{blob: base64_data, mime_type: mime_type} = ann.screenshot
 
-  # Fallback for legacy string format (before mime_type was tracked)
-  defp append_screenshot(parts, base64_data) when is_binary(base64_data) do
-    case Base.decode64(base64_data) do
-      {:ok, decoded_data} -> parts ++ [ContentPart.image(decoded_data, "image/jpeg")]
-      :error -> parts
-    end
+        case Base.decode64(base64_data) do
+          {:ok, decoded_data} -> [ContentPart.image(decoded_data, mime_type)]
+          :error -> []
+        end
+      end)
+
+    parts ++ screenshot_parts
   end
 
   # Append user-uploaded images to content parts
@@ -1243,13 +1425,12 @@ defmodule FrontmanServer.Tasks.Interaction do
   end
 
   @doc """
-  Checks if any user messages in the interactions contain a selected component.
-  Uses the pre-extracted `selected_component` field on UserMessage for efficiency.
+  Checks if any user messages in the interactions contain annotations.
   """
-  @spec has_selected_component?(list(t())) :: boolean()
-  def has_selected_component?(interactions) do
+  @spec has_annotations?(list(t())) :: boolean()
+  def has_annotations?(interactions) do
     Enum.any?(interactions, fn
-      %UserMessage{selected_component: sc} when not is_nil(sc) -> true
+      %UserMessage{annotations: anns} when anns != [] -> true
       _ -> false
     end)
   end

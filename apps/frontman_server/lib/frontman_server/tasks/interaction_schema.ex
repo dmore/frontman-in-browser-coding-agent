@@ -85,11 +85,10 @@ defmodule FrontmanServer.Tasks.InteractionSchema do
       sequence: sequence || data["sequence"] || 0,
       timestamp: parse_datetime(data["timestamp"]),
       messages: data["messages"] || [],
-      selected_component: parse_selected_component(data["selected_component"]),
-      selected_component_screenshot: parse_screenshot(data["selected_component_screenshot"]),
-      selected_figma_node: parse_figma_node(data["selected_figma_node"]),
+      annotations: parse_annotations(data["annotations"]),
+      selected_figma_node: Interaction.FigmaNode.from_map(data["selected_figma_node"]),
       images: parse_images(data["images"]),
-      current_page: parse_current_page(data["current_page"])
+      current_page: Interaction.CurrentPage.from_map(data["current_page"])
     }
   end
 
@@ -180,112 +179,19 @@ defmodule FrontmanServer.Tasks.InteractionSchema do
     end
   end
 
-  @spec parse_selected_component(map() | nil) :: map() | nil
-  defp parse_selected_component(nil), do: nil
+  # Parse annotations list from stored data — delegates to domain Annotation.from_map/1
+  defp parse_annotations(nil), do: []
 
-  defp parse_selected_component(data) when is_map(data) do
-    %{
-      file: data["file"],
-      line: data["line"],
-      column: data["column"],
-      source_snippet: data["source_snippet"],
-      source_type: data["source_type"],
-      component_name: data["component_name"],
-      component_props: data["component_props"],
-      parent: parse_parent_chain(data["parent"])
-    }
-  end
+  defp parse_annotations(annotations) when is_list(annotations),
+    do: Enum.map(annotations, &Interaction.Annotation.from_map/1)
 
-  @spec parse_parent_chain(map() | nil) :: map() | nil
-  defp parse_parent_chain(nil), do: nil
+  defp parse_annotations(_), do: []
 
-  defp parse_parent_chain(parent) when is_map(parent) do
-    %{
-      file: parent["file"],
-      line: parent["line"],
-      column: parent["column"],
-      source_snippet: nil,
-      source_type: nil,
-      component_name: parent["component_name"],
-      component_props: parent["component_props"],
-      parent: parse_parent_chain(parent["parent"])
-    }
-  end
-
-  defp parse_parent_chain(_), do: nil
-
-  @spec parse_figma_node(map() | nil) :: Interaction.FigmaNode.t() | nil
-  defp parse_figma_node(nil), do: nil
-
-  defp parse_figma_node(data) when is_map(data) do
-    %Interaction.FigmaNode{
-      id: data["id"],
-      node: data["node"],
-      image: data["image"],
-      is_dsl: data["is_dsl"] || true
-    }
-  end
-
-  # Parse screenshot data - handles both new map format and legacy string format
-  defp parse_screenshot(nil), do: nil
-
-  defp parse_screenshot(%{"blob" => blob, "mime_type" => mime_type})
-       when is_binary(blob) and is_binary(mime_type) do
-    %{blob: blob, mime_type: mime_type}
-  end
-
-  # Handle atom keys (from in-memory structs)
-  defp parse_screenshot(%{blob: blob, mime_type: mime_type})
-       when is_binary(blob) and is_binary(mime_type) do
-    %{blob: blob, mime_type: mime_type}
-  end
-
-  # Legacy format: just base64 string, default to image/jpeg
-  defp parse_screenshot(blob) when is_binary(blob) do
-    %{blob: blob, mime_type: "image/jpeg"}
-  end
-
-  defp parse_screenshot(_), do: nil
-
-  # Parse user-uploaded images from stored data
+  # Parse user-uploaded images from stored data — delegates to domain UserImage.from_map/1
   defp parse_images(nil), do: []
 
-  defp parse_images(images) when is_list(images) do
-    Enum.map(images, fn img when is_map(img) ->
-      %{
-        blob: img["blob"],
-        mime_type: img["mime_type"] || "image/png",
-        filename: img["filename"] || "attachment",
-        uri: img["uri"]
-      }
-    end)
-  end
+  defp parse_images(images) when is_list(images),
+    do: Enum.map(images, &Interaction.UserImage.from_map/1)
 
   defp parse_images(_), do: []
-
-  # Parse current page context from stored data
-  @spec parse_current_page(map() | nil) :: Interaction.UserMessage.current_page() | nil
-  defp parse_current_page(nil), do: nil
-
-  defp parse_current_page(data) when is_map(data) do
-    url = data["url"]
-
-    case url do
-      url when is_binary(url) ->
-        %{
-          url: url,
-          viewport_width: data["viewport_width"],
-          viewport_height: data["viewport_height"],
-          device_pixel_ratio: data["device_pixel_ratio"],
-          title: data["title"],
-          color_scheme: data["color_scheme"],
-          scroll_y: data["scroll_y"]
-        }
-
-      _ ->
-        nil
-    end
-  end
-
-  defp parse_current_page(_), do: nil
 end

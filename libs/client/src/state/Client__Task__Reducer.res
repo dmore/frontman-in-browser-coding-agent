@@ -10,7 +10,7 @@ module Task = Types.Task
 module Message = Types.Message
 module UserContentPart = Types.UserContentPart
 module AssistantContentPart = Types.AssistantContentPart
-module SelectedElement = Types.SelectedElement
+module Annotation = Types.Annotation
 module ACPTypes = Types.ACPTypes
 
 // ============================================================================
@@ -131,51 +131,51 @@ module Lens = {
     }
   }
 
-  // Toggle web preview selection mode
-  let toggleWebPreviewSelection = (task: Task.t): Task.t => {
+  // Set annotation mode
+  let setAnnotationMode = (task: Task.t, mode: Annotation.annotationMode): Task.t => {
     switch task {
-    | Task.New(data) =>
-      Task.New({
-        ...data,
-        webPreviewIsSelecting: !data.webPreviewIsSelecting,
-        selectedElement: if !data.webPreviewIsSelecting {
-          None
-        } else {
-          data.selectedElement
-        },
-      })
-    | Task.Loading(data) =>
-      Task.Loading({
-        ...data,
-        webPreviewIsSelecting: !data.webPreviewIsSelecting,
-        selectedElement: if !data.webPreviewIsSelecting {
-          None
-        } else {
-          data.selectedElement
-        },
-      })
-    | Task.Loaded(data) =>
-      Task.Loaded({
-        ...data,
-        webPreviewIsSelecting: !data.webPreviewIsSelecting,
-        selectedElement: if !data.webPreviewIsSelecting {
-          None
-        } else {
-          data.selectedElement
-        },
-      })
+    | Task.New(data) => Task.New({...data, annotationMode: mode})
+    | Task.Loading(data) => Task.Loading({...data, annotationMode: mode})
+    | Task.Loaded(data) => Task.Loaded({...data, annotationMode: mode})
     | Task.Unloaded(_) =>
-      failwith("[Lens.toggleWebPreviewSelection] Cannot toggle on Unloaded task")
+      failwith("[Lens.setAnnotationMode] Cannot set mode on Unloaded task")
     }
   }
 
-  // Set selected element
-  let setSelectedElement = (task: Task.t, selectedElement: option<SelectedElement.t>): Task.t => {
+  // Set annotations array
+  let setAnnotations = (task: Task.t, annotations: array<Annotation.t>): Task.t => {
     switch task {
-    | Task.New(data) => Task.New({...data, webPreviewIsSelecting: false, selectedElement})
-    | Task.Loading(data) => Task.Loading({...data, webPreviewIsSelecting: false, selectedElement})
-    | Task.Loaded(data) => Task.Loaded({...data, webPreviewIsSelecting: false, selectedElement})
-    | Task.Unloaded(_) => failwith("[Lens.setSelectedElement] Cannot set element on Unloaded task")
+    | Task.New(data) => Task.New({...data, annotations})
+    | Task.Loading(data) => Task.Loading({...data, annotations})
+    | Task.Loaded(data) => Task.Loaded({...data, annotations})
+    | Task.Unloaded(_) => failwith("[Lens.setAnnotations] Cannot set annotations on Unloaded task")
+    }
+  }
+
+  // Update a single annotation by ID
+  let updateAnnotation = (task: Task.t, id: string, fn: Annotation.t => Annotation.t): Task.t => {
+    let annotations = Task.getAnnotations(task)
+    let updated = annotations->Array.map(a => a.id == id ? fn(a) : a)
+    setAnnotations(task, updated)
+  }
+
+  // Set animation frozen state
+  let setAnimationFrozen = (task: Task.t, frozen: bool): Task.t => {
+    switch task {
+    | Task.New(data) => Task.New({...data, isAnimationFrozen: frozen})
+    | Task.Loading(data) => Task.Loading({...data, isAnimationFrozen: frozen})
+    | Task.Loaded(data) => Task.Loaded({...data, isAnimationFrozen: frozen})
+    | Task.Unloaded(_) => failwith("[Lens.setAnimationFrozen] Cannot set on Unloaded task")
+    }
+  }
+
+  // Set active popup annotation ID
+  let setActivePopupAnnotationId = (task: Task.t, id: option<string>): Task.t => {
+    switch task {
+    | Task.New(data) => Task.New({...data, activePopupAnnotationId: id})
+    | Task.Loading(data) => Task.Loading({...data, activePopupAnnotationId: id})
+    | Task.Loaded(data) => Task.Loaded({...data, activePopupAnnotationId: id})
+    | Task.Unloaded(_) => failwith("[Lens.setActivePopupAnnotationId] Cannot set on Unloaded task")
     }
   }
 
@@ -210,27 +210,51 @@ module Selectors = {
     )
   }
 
-  // Get selected element
-  // None = Unloaded (we don't know) - actual None selection is represented as Some(None)
-  let selectedElement = (task: Task.t): option<option<SelectedElement.t>> => {
+  // Get annotations
+  // None = Unloaded (we don't know)
+  let annotations = (task: Task.t): option<array<Annotation.t>> => {
     switch task {
     | Task.Unloaded(_) => None
-    | Task.New({selectedElement})
-    | Task.Loading({selectedElement})
-    | Task.Loaded({selectedElement}) =>
-      Some(selectedElement)
+    | Task.New({annotations})
+    | Task.Loading({annotations})
+    | Task.Loaded({annotations}) =>
+      Some(annotations)
     }
   }
 
-  // Get web preview selection mode
+  // Get annotation mode
   // None = Unloaded (we don't know)
+  let annotationMode = (task: Task.t): option<Annotation.annotationMode> => {
+    switch task {
+    | Task.Unloaded(_) => None
+    | Task.New({annotationMode})
+    | Task.Loading({annotationMode})
+    | Task.Loaded({annotationMode}) =>
+      Some(annotationMode)
+    }
+  }
+
+  // Derive webPreviewIsSelecting from annotationMode
   let webPreviewIsSelecting = (task: Task.t): option<bool> => {
     switch task {
     | Task.Unloaded(_) => None
-    | Task.New({webPreviewIsSelecting})
-    | Task.Loading({webPreviewIsSelecting})
-    | Task.Loaded({webPreviewIsSelecting}) =>
-      Some(webPreviewIsSelecting)
+    | _ => Some(Task.getWebPreviewIsSelecting(task))
+    }
+  }
+
+  // Get animation frozen state
+  let isAnimationFrozen = (task: Task.t): option<bool> => {
+    switch task {
+    | Task.Unloaded(_) => None
+    | _ => Some(Task.getIsAnimationFrozen(task))
+    }
+  }
+
+  // Get active popup annotation ID
+  let activePopupAnnotationId = (task: Task.t): option<option<string>> => {
+    switch task {
+    | Task.Unloaded(_) => None
+    | _ => Some(Task.getActivePopupAnnotationId(task))
     }
   }
 
@@ -309,6 +333,13 @@ module Selectors = {
 // Task Actions - operate on a single Task (no taskId needed)
 // ============================================================================
 
+// Element data for batch annotation (drag selection)
+type annotationElement = {
+  element: WebAPI.DOMAPI.element,
+  position: Annotation.position,
+  tagName: string,
+}
+
 type action =
   // Streaming actions
   | StreamingStarted
@@ -320,8 +351,25 @@ type action =
   | ToolCallReceived({toolCall: Message.toolCall})
   // Content actions
   | AddUserMessage({id: string, content: array<UserContentPart.t>})
-  | SetSelectedElement({selectedElement: option<SelectedElement.t>})
-  | ToggleWebPreviewSelection
+  // Annotation actions — unified selection mode
+  | SetAnnotationMode({mode: Annotation.annotationMode})
+  | ToggleAnnotationMode
+  | ToggleAnnotation({element: WebAPI.DOMAPI.element, position: Annotation.position, tagName: string})
+  | AnnotationDetailsResolved({
+      id: string,
+      selector: option<string>,
+      screenshot: option<string>,
+      sourceLocation: option<Client__Types.SourceLocation.t>,
+      cssClasses: option<string>,
+      nearbyText: option<string>,
+      boundingBox: option<Annotation.boundingBox>,
+    })
+  | AddAnnotations({elements: array<annotationElement>})
+  | RemoveAnnotation({id: string})
+  | ClearAnnotations
+  | UpdateAnnotationComment({id: string, comment: string})
+  | SetActivePopupAnnotationId({id: option<string>})
+  | ToggleAnimationFrozen
   | SetPreviewUrl({url: string})
   | SetPreviewFrame({
       contentDocument: option<WebAPI.DOMAPI.document>,
@@ -350,7 +398,8 @@ type action =
 // ============================================================================
 
 type effect =
-  | FetchElementDetails({
+  | FetchAnnotationDetails({
+      id: string,
       element: WebAPI.DOMAPI.element,
       document: option<WebAPI.DOMAPI.document>,
       contentWindow: option<WebAPI.DOMAPI.window>,
@@ -380,8 +429,16 @@ let actionToString = (action: action): string =>
   | ToolInputReceived(_) => "ToolInputReceived"
   | ToolResultReceived(_) => "ToolResultReceived"
   | ToolErrorReceived(_) => "ToolErrorReceived"
-  | SetSelectedElement(_) => "SetSelectedElement"
-  | ToggleWebPreviewSelection => "ToggleWebPreviewSelection"
+  | SetAnnotationMode(_) => "SetAnnotationMode"
+  | ToggleAnnotationMode => "ToggleAnnotationMode"
+  | ToggleAnnotation(_) => "ToggleAnnotation"
+  | AnnotationDetailsResolved(_) => "AnnotationDetailsResolved"
+  | AddAnnotations(_) => "AddAnnotations"
+  | RemoveAnnotation(_) => "RemoveAnnotation"
+  | ClearAnnotations => "ClearAnnotations"
+  | UpdateAnnotationComment(_) => "UpdateAnnotationComment"
+  | SetActivePopupAnnotationId(_) => "SetActivePopupAnnotationId"
+  | ToggleAnimationFrozen => "ToggleAnimationFrozen"
   | SetPreviewUrl(_) => "SetPreviewUrl"
   | SetPreviewFrame(_) => "SetPreviewFrame"
   | SetDeviceMode(_) => "SetDeviceMode"
@@ -457,11 +514,13 @@ let next = (task: Task.t, action: action): (Task.t, array<effect>) => {
     let urlChanged = normalizeUrl(currentUrl) != normalizeUrl(url)
     let updated = Lens.setPreviewUrl(task, url)
 
-    // Clear selected element only on actual navigation, not initial iframe mount
-    if urlChanged {
-      (Lens.setSelectedElement(updated, None), [])
-    } else {
+    // Clear annotations and popup on actual navigation, not initial iframe mount
+    switch urlChanged {
+    | true =>
+      let updated = Lens.setAnnotations(updated, [])
+      let updated = Lens.setActivePopupAnnotationId(updated, None)
       (updated, [])
+    | false => (updated, [])
     }
 
   | (Task.Unloaded(_), SetPreviewFrame(_)) => (task, [])
@@ -490,27 +549,140 @@ let next = (task: Task.t, action: action): (Task.t, array<effect>) => {
     }
     (Lens.setDeviceMode(task, newDeviceMode), [])
 
-  | (Task.Unloaded(_), ToggleWebPreviewSelection) => (task, [])
-  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), ToggleWebPreviewSelection) => (
-      Lens.toggleWebPreviewSelection(task),
-      [],
-    )
+  // Annotation actions — unified selection mode
+  | (Task.Unloaded(_), SetAnnotationMode(_) | ToggleAnnotationMode) => (task, [])
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), SetAnnotationMode({mode})) => {
+    let updated = Lens.setAnnotationMode(task, mode)
+    // Close popup and unfreeze when switching to Off
+    let updated = switch mode {
+    | Annotation.Off =>
+      updated
+      ->Lens.setActivePopupAnnotationId(None)
+      ->Lens.setAnimationFrozen(false)
+    | _ => updated
+    }
+    (updated, [])
+  }
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), ToggleAnnotationMode) => {
+    let newMode = switch Task.getAnnotationMode(task) {
+    | Annotation.Off => Annotation.Selecting
+    | _ => Annotation.Off
+    }
+    let updated = Lens.setAnnotationMode(task, newMode)
+    // Close popup and unfreeze when toggling off
+    let updated = switch newMode {
+    | Annotation.Off =>
+      updated
+      ->Lens.setActivePopupAnnotationId(None)
+      ->Lens.setAnimationFrozen(false)
+    | _ => updated
+    }
+    (updated, [])
+  }
 
-  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), SetSelectedElement({selectedElement})) =>
-    // Decide if we need to fetch element details
-    let effects = switch selectedElement {
-    | Some({element, selector: None, screenshot: None, sourceLocation: None}) =>
+  // Toggle annotation: click already-annotated element removes it, click new element adds it
+  | (Task.Unloaded(_), ToggleAnnotation(_)) => (task, [])
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), ToggleAnnotation({element, position, tagName})) => {
+    let existing = Annotation.findByElement(Task.getAnnotations(task), element)
+    switch existing {
+    | Some(ann) =>
+      // Element already annotated — deselect it and close popup
+      let annotations = Task.getAnnotations(task)->Array.filter(a => a.id != ann.id)
+      let updated = Lens.setAnnotations(task, annotations)
+      let updated = Lens.setActivePopupAnnotationId(updated, None)
+      (updated, [])
+    | None =>
+      // New element — add annotation immediately, open popup, fetch details
+      let annotation = Annotation.make(~element, ~position, ~tagName)
       let previewFrame = Task.getPreviewFrame(task, ~defaultUrl="")
-      [
-        FetchElementDetails({
+      let effects = [
+        FetchAnnotationDetails({
+          id: annotation.id,
           element,
           document: previewFrame.contentDocument,
           contentWindow: previewFrame.contentWindow,
         }),
       ]
-    | _ => []
+      let allAnnotations = Array.concat(Task.getAnnotations(task), [annotation])
+      let updated = Lens.setAnnotations(task, allAnnotations)
+      let updated = Lens.setActivePopupAnnotationId(updated, Some(annotation.id))
+      (updated, effects)
     }
-    (Lens.setSelectedElement(task, selectedElement), effects)
+  }
+
+  // Async annotation fetch completed after task transitioned to Unloaded — discard silently
+  | (Task.Unloaded(_), AnnotationDetailsResolved(_)) => (task, [])
+
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), AnnotationDetailsResolved({id, selector, screenshot, sourceLocation, cssClasses, nearbyText, boundingBox})) => (
+    Lens.updateAnnotation(task, id, a => {
+      ...a,
+      selector,
+      screenshot: screenshot->Option.map(s => s),
+      sourceLocation,
+      cssClasses,
+      nearbyText,
+      boundingBox,
+    }),
+    [],
+  )
+
+  // Add multiple annotations at once (for drag selection)
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), AddAnnotations({elements})) => {
+    let previewFrame = Task.getPreviewFrame(task, ~defaultUrl="")
+    let newAnnotations = elements->Array.map(el =>
+      Annotation.make(~element=el.element, ~position=el.position, ~tagName=el.tagName)
+    )
+    let effects = newAnnotations->Array.map(annotation =>
+      FetchAnnotationDetails({
+        id: annotation.id,
+        element: annotation.element,
+        document: previewFrame.contentDocument,
+        contentWindow: previewFrame.contentWindow,
+      })
+    )
+    let allAnnotations = Array.concat(Task.getAnnotations(task), newAnnotations)
+    (Lens.setAnnotations(task, allAnnotations), effects)
+  }
+
+  | (Task.Unloaded(_), RemoveAnnotation(_)) => (task, [])
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), RemoveAnnotation({id})) => {
+    let annotations = Task.getAnnotations(task)->Array.filter(a => a.id != id)
+    let updated = Lens.setAnnotations(task, annotations)
+    // Close popup if it was for the removed annotation
+    let updated = switch Task.getActivePopupAnnotationId(task) {
+    | Some(activeId) if activeId == id => Lens.setActivePopupAnnotationId(updated, None)
+    | _ => updated
+    }
+    (updated, [])
+  }
+
+  | (Task.Unloaded(_), ClearAnnotations) => (task, [])
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), ClearAnnotations) => {
+    let updated = Lens.setAnnotations(task, [])
+    let updated = Lens.setActivePopupAnnotationId(updated, None)
+    (updated, [])
+  }
+
+  // Toggle animation freeze (only when in selection mode)
+  | (Task.Unloaded(_), ToggleAnimationFrozen) => (task, [])
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), ToggleAnimationFrozen) =>
+    (Lens.setAnimationFrozen(task, !Task.getIsAnimationFrozen(task)), [])
+
+  // Set active popup annotation ID (for opening/closing the comment popup)
+  | (Task.Unloaded(_), SetActivePopupAnnotationId(_)) => (task, [])
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), SetActivePopupAnnotationId({id})) =>
+    (Lens.setActivePopupAnnotationId(task, id), [])
+
+  // Update comment on an existing annotation
+  | (Task.Unloaded(_), UpdateAnnotationComment(_)) => (task, [])
+  | (Task.New(_) | Task.Loading(_) | Task.Loaded(_), UpdateAnnotationComment({id, comment})) => {
+    let trimmed = comment->String.trim
+    let commentValue = trimmed->String.length > 0 ? Some(trimmed) : None
+    (
+      Lens.updateAnnotation(task, id, a => {...a, comment: commentValue}),
+      [],
+    )
+  }
 
   // ============================================================================
   // Message Actions - work on Loading or Loaded (via Lens)
@@ -735,8 +907,10 @@ let next = (task: Task.t, action: action): (Task.t, array<effect>) => {
         updatedAt,
         messages: MessageStore.make(),
         previewFrame: {url: previewUrl, contentDocument: None, contentWindow: None, deviceMode: Client__DeviceMode.defaultDeviceMode, orientation: Client__DeviceMode.defaultOrientation},
-        webPreviewIsSelecting: false,
-        selectedElement: None,
+        annotationMode: Annotation.Off,
+        annotations: [],
+        activePopupAnnotationId: None,
+        isAnimationFrozen: false,
       }),
       [],
     )
@@ -752,8 +926,10 @@ let next = (task: Task.t, action: action): (Task.t, array<effect>) => {
         updatedAt,
         messages,
         previewFrame,
-        webPreviewIsSelecting,
-        selectedElement,
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
       }) =>
       let sortedMessages = MessageStore.toSorted(messages, (a, b) =>
         Selectors.getMessageCreatedAt(a) -. Selectors.getMessageCreatedAt(b)
@@ -767,8 +943,10 @@ let next = (task: Task.t, action: action): (Task.t, array<effect>) => {
           updatedAt,
           messages: sortedMessages,
           previewFrame,
-          webPreviewIsSelecting,
-          selectedElement,
+          annotationMode,
+          annotations,
+          activePopupAnnotationId,
+          isAnimationFrozen,
           isAgentRunning: false,
           planEntries: [],
           turnError: None,
@@ -802,7 +980,7 @@ let next = (task: Task.t, action: action): (Task.t, array<effect>) => {
 
 let handleEffect = (effect: effect, ~dispatch: action => unit, ~delegate: delegated => unit) => {
   switch effect {
-  | FetchElementDetails({element, document, contentWindow}) => {
+  | FetchAnnotationDetails({id, element, document, contentWindow}) => {
       // Fetch selector
       let selectorPromise =
         Promise.resolve()
@@ -863,6 +1041,39 @@ let handleEffect = (effect: effect, ~dispatch: action => unit, ~delegate: delega
         Promise.race([detectionPromise, timeoutPromise])
       }
 
+      // Extract enrichment data synchronously from the DOM element
+      // Use getAttribute("class") instead of element.className because SVG elements
+      // return an SVGAnimatedString object for className, not a plain string
+      let cssClasses =
+        element
+        ->WebAPI.Element.getAttribute("class")
+        ->Null.toOption
+        ->Option.flatMap(cls => {
+          let trimmed = cls->String.trim
+          trimmed->String.length > 0 ? Some(trimmed) : None
+        })
+
+      let nearbyText = {
+        let own =
+          element
+          ->WebAPI.Element.asNode
+          ->WebAPI.Node.textContent
+          ->Null.toOption
+          ->Option.getOr("")
+          ->String.trim
+        // Truncate to 200 chars to keep payload reasonable
+        let truncated = own->String.length > 200 ? own->String.slice(~start=0, ~end=200) ++ "..." : own
+        truncated->String.length > 0 ? Some(truncated) : None
+      }
+
+      let rect = WebAPI.Element.getBoundingClientRect(element)
+      let boundingBox: Annotation.boundingBox = {
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height,
+      }
+
       // Wait for all promises and update state once
       let _ =
         Promise.all3((selectorPromise, screenshotPromise, sourceLocationPromise))
@@ -894,19 +1105,21 @@ let handleEffect = (effect: effect, ~dispatch: action => unit, ~delegate: delega
           // Dispatch only after resolution completes (or fails with fallback)
           resolvedSourceLocationPromise->Promise.then(finalSourceLocation => {
             dispatch(
-              SetSelectedElement({
-                selectedElement: Some({
-                  element,
-                  selector,
-                  screenshot: screenshot->Option.map(s => s.src),
-                  sourceLocation: finalSourceLocation,
-                }),
+              AnnotationDetailsResolved({
+                id,
+                selector,
+                screenshot: screenshot->Option.map(s => s.src),
+                sourceLocation: finalSourceLocation,
+                cssClasses,
+                nearbyText,
+                boundingBox: Some(boundingBox),
               }),
             )
             Promise.resolve()
           })
         })
-        ->Promise.catch(_ => {
+        ->Promise.catch(err => {
+          Console.error2("FetchAnnotationDetails failed:", err)
           Promise.resolve()
         })
     }

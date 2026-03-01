@@ -10,11 +10,11 @@ defmodule FrontmanServer.Tasks.Execution.PromptsTest do
   alias FrontmanServer.Tasks.Execution.Prompts
 
   describe "build/1 context-based guidance selection" do
-    test "selected_component alone adds selected component guidance" do
-      prompt = Prompts.build(has_selected_component: true)
+    test "has_annotations adds annotation guidance" do
+      prompt = Prompts.build(has_annotations: true)
 
-      # Should include selected component specific section
-      assert prompt =~ "Selected Component"
+      # Should include annotation-specific section
+      assert prompt =~ "Annotated Elements"
       assert prompt =~ "Read the file"
       # Should include direct-action guidance (not exploration)
       assert prompt =~ "Never explore"

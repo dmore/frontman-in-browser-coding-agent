@@ -43,8 +43,8 @@ module Actions = {
   let setPreviewFrame = (~contentDocument, ~contentWindow) =>
     Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: SetPreviewFrame({contentDocument, contentWindow})}))
 
-  let toggleWebPreviewSelection = () =>
-    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: ToggleWebPreviewSelection}))
+  let setAnnotationMode = (~mode) =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: SetAnnotationMode({mode: mode})}))
 
   // Device mode action creators
   let setDeviceMode = (~deviceMode) =>
@@ -56,8 +56,34 @@ module Actions = {
   let toggleDeviceMode = () =>
     Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: ToggleDeviceMode}))
 
-  let setSelectedElement = (~selectedElement) =>
-    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: SetSelectedElement({selectedElement: selectedElement})}))
+  // Toggle between Off and Selecting mode
+  let toggleWebPreviewSelection = () =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: ToggleAnnotationMode}))
+
+  let toggleAnnotation = (~element, ~position, ~tagName) =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: ToggleAnnotation({element, position, tagName})}))
+
+  let addAnnotations = (~elements) =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: AddAnnotations({elements: elements})}))
+
+  let removeAnnotation = (~id) =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: RemoveAnnotation({id: id})}))
+
+  let clearAnnotations = () =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: ClearAnnotations}))
+
+  let updateAnnotationComment = (~id, ~comment) =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: UpdateAnnotationComment({id, comment})}))
+
+  let setActivePopupAnnotationId = (~id) =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: SetActivePopupAnnotationId({id: id})}))
+
+  let closeAnnotationPopup = () =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: SetActivePopupAnnotationId({id: None})}))
+
+  let toggleAnimationFrozen = () =>
+    Client__State__Store.dispatch(TaskAction({target: CurrentTask, action: ToggleAnimationFrozen}))
+
 
   // Task management action creators
   // Note: Tasks are created implicitly when user sends first message (lazy session creation)

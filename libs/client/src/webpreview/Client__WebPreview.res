@@ -3,12 +3,11 @@
  * 
  * Uses pure ReScript navigation components instead of AIElements.
  */
-
 module Nav = Client__WebPreview__Nav
 module RadixUI__Icons = Bindings__RadixUI__Icons
 
 @send external locationAssign: ('a, string) => unit = "assign"
-@send external blur: (Dom.element) => unit = "blur"
+@send external blur: Dom.element => unit = "blur"
 
 module BackButton = {
   @react.component
@@ -37,22 +36,7 @@ module ReloadButton = {
   }
 }
 
-module SelectElement = {
-  @react.component
-  let make = (~onClick: unit => unit, ~isSelecting: bool) => {
-    <button
-      type_="button"
-      onClick={_ => onClick()}
-      className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors
-                 ${isSelecting
-          ? "bg-violet-600 text-white hover:bg-violet-500"
-          : "bg-gray-200 text-gray-600 hover:bg-gray-300 hover:text-gray-700"}`}
-      title={isSelecting ? "Exit selection mode" : "Select element"}
-    >
-      <Client__ToolIcons.CursorClickIcon size=16 />
-    </button>
-  }
-}
+// SelectElement replaced by AnnotationControls (D4)
 
 module DeviceModeToggle = {
   @react.component
@@ -94,7 +78,7 @@ type resizeObserverEntry = {contentRect: WebAPI.DOMAPI.domRectReadOnly}
 
 @send external observeElement: ({..}, Dom.element) => unit = "observe"
 
-@send external disconnectObserver: ({..}) => unit = "disconnect"
+@send external disconnectObserver: {..} => unit = "disconnect"
 
 // Hook to measure the available space in the viewport container
 let useContainerSize = (ref: React.ref<Nullable.t<Dom.element>>): (int, int) => {
@@ -106,20 +90,18 @@ let useContainerSize = (ref: React.ref<Nullable.t<Dom.element>>): (int, int) => 
     | Some(element) =>
       // Initial measurement
       let rect = WebAPI.Element.getBoundingClientRect(element->Obj.magic)
-      setSize(_ => (
-        rect.width->Float.toInt,
-        rect.height->Float.toInt,
-      ))
+      setSize(_ => (rect.width->Float.toInt, rect.height->Float.toInt))
 
       // Observe resize
       let observer = makeResizeObserver(entries => {
-        entries->Array.get(0)->Option.forEach(entry => {
-          let cr: WebAPI.DOMAPI.domRectReadOnly = entry.contentRect
-          setSize(_ => (
-            cr.width->Float.toInt,
-            cr.height->Float.toInt,
-          ))
-        })
+        entries
+        ->Array.get(0)
+        ->Option.forEach(
+          entry => {
+            let cr: WebAPI.DOMAPI.domRectReadOnly = entry.contentRect
+            setSize(_ => (cr.width->Float.toInt, cr.height->Float.toInt))
+          },
+        )
       })
       observer->observeElement(element)
       Some(() => observer->disconnectObserver)
@@ -136,9 +118,7 @@ let make = () => {
   let persistedTasks = Client__State.useSelector(Client__State.Selectors.tasks)
   let previewUrl = Client__State.useSelector(Client__State.Selectors.previewUrl)
   let previewFrame = Client__State.useSelector(Client__State.Selectors.previewFrame)
-  let webPreviewIsSelecting = Client__State.useSelector(
-    Client__State.Selectors.webPreviewIsSelecting,
-  )
+  let annotationMode = Client__State.useSelector(Client__State.Selectors.annotationMode)
   let deviceMode = Client__State.useSelector(Client__State.Selectors.deviceMode)
   let deviceOrientation = Client__State.useSelector(Client__State.Selectors.deviceOrientation)
 
@@ -169,14 +149,17 @@ let make = () => {
       switch Client__BrowserUrl.resolveUrlWithBase(~url=editableUrl, ~base=previewUrl) {
       | None => ()
       | Some(resolvedUrl) =>
-        switch Client__BrowserUrl.isSameOriginWithBase(~baseUrl=previewUrl, ~targetUrl=resolvedUrl) {
+        switch Client__BrowserUrl.isSameOriginWithBase(
+          ~baseUrl=previewUrl,
+          ~targetUrl=resolvedUrl,
+        ) {
         | false => ()
         | true =>
           previewFrame.contentWindow->Option.forEach(contentWindow => {
             contentWindow.location->locationAssign(resolvedUrl)
           })
           Client__State.Actions.setPreviewUrl(~url=resolvedUrl)
-          Client__State.Actions.setSelectedElement(~selectedElement=None)
+          Client__State.Actions.clearAnnotations()
           Client__BrowserUrl.syncBrowserUrl(~previewUrl=resolvedUrl)
         }
       }
@@ -202,23 +185,23 @@ let make = () => {
     previewFrame.contentWindow->Option.forEach(contentWindow => {
       WebAPI.History.back(contentWindow.history)
     })
-    Client__State.Actions.setSelectedElement(~selectedElement=None)
+    Client__State.Actions.clearAnnotations()
   }
 
   let handleForward = () => {
     previewFrame.contentWindow->Option.forEach(contentWindow => {
       WebAPI.History.forward(contentWindow.history)
     })
-    Client__State.Actions.setSelectedElement(~selectedElement=None)
+    Client__State.Actions.clearAnnotations()
   }
 
   let handleReload = () => {
     previewFrame.contentWindow->Option.forEach(contentWindow => {
       WebAPI.Location.reload(contentWindow.location)
     })
-    Client__State.Actions.setSelectedElement(~selectedElement=None)
+    Client__State.Actions.clearAnnotations()
   }
-  let handleSelect = () => Client__State.Actions.toggleWebPreviewSelection()
+  let handleToggleSelection = () => Client__State.Actions.toggleWebPreviewSelection()
   let handleOpenInNewTab = () => {
     WebAPI.Window.open_(
       WebAPI.Global.window,
@@ -248,79 +231,84 @@ let make = () => {
     Some((deviceWidth, deviceHeight, scale))
   }
 
-    <Nav.Container>
-      <Nav.Navigation>
-        <Nav.TrafficLights />
-        <BackButton onClick={handleBack} />
-        <ForwardButton onClick={handleForward} />
-        <ReloadButton onClick={handleReload} />
-        <Nav.UrlInput
-          value={displayedUrl}
-          onChange={handleUrlChange}
-          onKeyDown={handleUrlKeyDown}
-          onFocus={handleUrlFocus}
-          onBlur={handleUrlBlur}
-        />
-        <DeviceModeToggle isActive={deviceModeActive} onClick={handleToggleDeviceMode} />
-        <SelectElement onClick={handleSelect} isSelecting={webPreviewIsSelecting} />
-        <OpenInNewWindow onClick={handleOpenInNewTab} />
-      </Nav.Navigation>
+  <Nav.Container>
+    <Nav.Navigation>
+      <BackButton onClick={handleBack} />
+      <ForwardButton onClick={handleForward} />
+      <ReloadButton onClick={handleReload} />
+      <Nav.UrlInput
+        value={displayedUrl}
+        onChange={handleUrlChange}
+        onKeyDown={handleUrlKeyDown}
+        onFocus={handleUrlFocus}
+        onBlur={handleUrlBlur}
+      />
+      <DeviceModeToggle isActive={deviceModeActive} onClick={handleToggleDeviceMode} />
+      <Client__WebPreview__AnnotationControls
+        mode={annotationMode}
+        onToggle={handleToggleSelection}
+        previewDocument=?{previewFrame.contentDocument}
+      />
+      <OpenInNewWindow onClick={handleOpenInNewTab} />
+    </Nav.Navigation>
 
-      <Client__WebPreview__DeviceBar deviceMode orientation=deviceOrientation />
+    <Client__WebPreview__DeviceBar deviceMode orientation=deviceOrientation />
 
-      <div
-        ref={ReactDOM.Ref.callbackDomRef(el => {
-          containerRef.current = el
-          None
-        })}
-        className={switch effectiveDims {
-        | None => "relative size-full overflow-y-hidden"
-        | Some(_) =>
-          "relative size-full overflow-hidden flex items-start justify-center bg-[repeating-conic-gradient(#f3f4f6_0%_25%,#ffffff_0%_50%)] bg-[length:16px_16px]"
-        }}
-      >
-        {switch previewFrame.contentDocument {
-        | Some(document) => <Client__WebPreview__Stage document={document} viewportStyle=?viewportStyle />
-        | _ => React.null
-        }}
+    <div
+      ref={ReactDOM.Ref.callbackDomRef(el => {
+        containerRef.current = el
+        None
+      })}
+      className={switch effectiveDims {
+      | None => "relative size-full overflow-y-hidden"
+      | Some(
+          _,
+        ) => "relative size-full overflow-hidden flex items-start justify-center bg-[repeating-conic-gradient(#f3f4f6_0%_25%,#ffffff_0%_50%)] bg-[length:16px_16px]"
+      }}
+    >
+      {switch previewFrame.contentDocument {
+      | Some(document) =>
+        <Client__WebPreview__Stage document={document} viewportStyle=?viewportStyle />
+      | _ => React.null
+      }}
 
-        // Unified array of all iframes - keeps React keys in the same sibling position
-        // so switching tasks just toggles isActive prop without unmounting/remounting
-        {
-          let defaultUrl = Client__BrowserUrl.getInitialUrl()
-          
-          // Build array of all tasks including New task if present
-          let allTasks = if isNewTask {
-            // Prepend New task iframe (uses previewFrame from selector)
-            Array.concat(
-              [(currentTaskClientId, previewFrame.url)],
-              persistedTasks->Array.map(task => {
-                let clientId = Client__Task__Types.Task.getClientId(task)
-                let taskPreviewFrame = Client__Task__Types.Task.getPreviewFrame(task, ~defaultUrl)
-                (clientId, taskPreviewFrame.url)
-              })
-            )
-          } else {
-            // All tasks are in persistedTasks array
+      // Unified array of all iframes - keeps React keys in the same sibling position
+      // so switching tasks just toggles isActive prop without unmounting/remounting
+      {
+        let defaultUrl = Client__BrowserUrl.getInitialUrl()
+
+        // Build array of all tasks including New task if present
+        let allTasks = if isNewTask {
+          // Prepend New task iframe (uses previewFrame from selector)
+          Array.concat(
+            [(currentTaskClientId, previewFrame.url)],
             persistedTasks->Array.map(task => {
               let clientId = Client__Task__Types.Task.getClientId(task)
               let taskPreviewFrame = Client__Task__Types.Task.getPreviewFrame(task, ~defaultUrl)
               (clientId, taskPreviewFrame.url)
-            })
-          }
-
-          allTasks
-          ->Array.map(((clientId, url)) => {
-            <Client__WebPreview__Body
-              key={clientId}
-              taskId={clientId}
-              url={url}
-              isActive={clientId == currentTaskClientId}
-              viewportStyle=?viewportStyle
-            />
+            }),
+          )
+        } else {
+          // All tasks are in persistedTasks array
+          persistedTasks->Array.map(task => {
+            let clientId = Client__Task__Types.Task.getClientId(task)
+            let taskPreviewFrame = Client__Task__Types.Task.getPreviewFrame(task, ~defaultUrl)
+            (clientId, taskPreviewFrame.url)
           })
-          ->React.array
         }
-      </div>
-    </Nav.Container>
+
+        allTasks
+        ->Array.map(((clientId, url)) => {
+          <Client__WebPreview__Body
+            key={clientId}
+            taskId={clientId}
+            url={url}
+            isActive={clientId == currentTaskClientId}
+            viewportStyle=?viewportStyle
+          />
+        })
+        ->React.array
+      }
+    </div>
+  </Nav.Container>
 }
