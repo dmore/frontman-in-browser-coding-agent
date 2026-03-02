@@ -6,6 +6,8 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
   - Root agent (dynamic, context-aware)
   """
 
+  alias FrontmanServer.Tasks.Execution.Framework
+
   # --- Root Agent Prompts ---
 
   @base_tool_selection_guidance """
@@ -169,8 +171,12 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
   defp maybe_append(prompt, true, guidance_fn), do: prompt <> "\n" <> guidance_fn.()
   defp maybe_append(prompt, false, _guidance_fn), do: prompt
 
-  defp append_framework_guidance(prompt, "nextjs"), do: prompt <> "\n" <> nextjs_guidance()
-  defp append_framework_guidance(prompt, _), do: prompt
+  defp append_framework_guidance(prompt, %Framework{id: :nextjs}),
+    do: prompt <> "\n" <> nextjs_guidance()
+
+  defp append_framework_guidance(prompt, %Framework{id: :vite}), do: prompt
+  defp append_framework_guidance(prompt, %Framework{id: :astro}), do: prompt
+  defp append_framework_guidance(prompt, nil), do: prompt
 
   defp append_project_structure(prompt, nil), do: prompt
   defp append_project_structure(prompt, ""), do: prompt

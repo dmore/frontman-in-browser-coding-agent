@@ -22,7 +22,7 @@ defmodule FrontmanServer.Tasks.Execution do
   alias FrontmanServer.Providers
   alias FrontmanServer.Providers.ResolvedKey
   alias FrontmanServer.Tasks
-  alias FrontmanServer.Tasks.Execution.{RootAgent, ToolExecutor}
+  alias FrontmanServer.Tasks.Execution.{Framework, RootAgent, ToolExecutor}
   alias FrontmanServer.Tasks.{Interaction, Task}
   alias SwarmAi.LLM.Chunk
   alias SwarmAi.Message
@@ -214,7 +214,8 @@ defmodule FrontmanServer.Tasks.Execution do
   defp build_agent(%Task{} = task, tools, opts, %ResolvedKey{} = resolved_key) do
     case Keyword.get(opts, :agent) do
       nil ->
-        has_typescript_react = task.framework in ["nextjs"]
+        fw = Framework.from_string(task.framework)
+        has_typescript_react = Framework.has_typescript_react?(fw)
 
         # Derive prompt data from task interactions
         project_rules =
@@ -245,7 +246,7 @@ defmodule FrontmanServer.Tasks.Execution do
           has_annotations: Interaction.has_annotations?(task.interactions),
           has_current_page: Interaction.has_current_page?(task.interactions),
           has_typescript_react: has_typescript_react,
-          framework: task.framework,
+          framework: fw,
           model: model_spec,
           llm_opts: llm_opts,
           project_rules: project_rules,
