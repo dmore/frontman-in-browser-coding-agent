@@ -34,11 +34,11 @@ This can be:
 ### 2. Set up containerized worktree
 
 1. Check infra: `make infra-status` — run `make infra-up` if needed
-2. Check if pod already exists: `make worktree-pod-list`
+2. Check if pod already exists: `make wt`
    - If running → skip creation
-   - If stopped → `make worktree-pod-start BRANCH=<branch-name>`
-   - If missing → `make worktree-pod-create BRANCH=<branch-name>`
-3. Verify: `make worktree-pod-list`
+   - If stopped → `make wt-start BRANCH=<branch-name>`
+   - If missing → `make wt-new BRANCH=<branch-name>`
+3. Verify: `make wt`
 
 ### 3. Tell the user to re-open the agent
 
@@ -52,7 +52,7 @@ Worktree is ready. To start working, open your agent from the worktree directory
 
 Start the dev servers in another terminal:
 
-  make worktree-pod-dev BRANCH=<branch-name>
+   make wt-dev BRANCH=<branch-name>
 ```
 
 **Do NOT attempt to implement anything.** The agent cannot operate on files in the worktree from the repo root. The user must re-open the agent from the worktree directory.
