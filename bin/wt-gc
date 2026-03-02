@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# Garbage-collect worktrees whose branches have been merged into main.
+#
+# For each worktree in .worktrees/:
+#   1. Checks if its branch is fully merged into origin/main
+#   2. If merged: tears down pod + volumes (if any), removes the worktree,
+#      and deletes the local branch
+#   3. If unmerged or has uncommitted changes: skips with a warning
+#
+# Called by: make wt-gc
+#
+# Required env: MD5CMD (set by Makefile)
+
+set -euo pipefail
+
+# ── Colors ──────────────────────────────────────────────
+GREEN='\033[32m'
+YELLOW='\033[33m'
+RED='\033[31m'
+CYAN='\033[36m'
+DIM='\033[2m'
+BOLD='\033[1m'
+RESET='\033[0m'
+
+# ── Resolve main repo root (works from any worktree) ────
+MAIN_REPO=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+WORKTREES_DIR="${MAIN_REPO}/.worktrees"
+
+# Portable MD5 (same logic as Makefile / dashboard)
+md5_short() {
+  if command -v md5sum >/dev/null 2>&1; then
+    echo -n "$1" | md5sum | cut -c1-4
+  else
+    echo -n "$1" | md5 | cut -c1-4
+  fi
+}
+
+# ── Preflight ───────────────────────────────────────────
+if [[ ! -d "$WORKTREES_DIR" ]]; then
+  printf "${DIM}No .worktrees/ directory — nothing to clean.${RESET}\n"
+  exit 0
+fi
+
+printf "${BOLD}Worktree garbage collection${RESET}\n"
+echo ""
+
+# Fetch latest remote state so merge-base checks are accurate
+printf "${DIM}Fetching origin...${RESET}\n"
+git fetch --prune origin --quiet
+echo ""
+
+# ── Collect worktree branches ───────────────────────────
+branches=()
+
+# Single-level: .worktrees/my-branch
+for wt in "$WORKTREES_DIR"/*; do
+  [[ -d "$wt" ]] || continue
+  if [[ -f "$wt/.git" ]] || [[ -d "$wt/.git" ]]; then
+    branches+=("$(basename "$wt")")
+  fi
+done
+
+# Nested: .worktrees/feature/my-branch
+for wt in "$WORKTREES_DIR"/*/*; do
+  [[ -d "$wt" ]] || continue
+  if [[ -f "$wt/.git" ]] || [[ -d "$wt/.git" ]]; then
+    branches+=("$(echo "$wt" | sed "s|^${WORKTREES_DIR}/||")")
+  fi
+done
+
+if [[ ${#branches[@]} -eq 0 ]]; then
+  printf "${DIM}No worktrees found — nothing to clean.${RESET}\n"
+  exit 0
+fi
+
+cleaned=0
+skipped=0
+
+for branch in "${branches[@]}"; do
+  wt_dir="${WORKTREES_DIR}/${branch}"
+  hash=$(md5_short "$branch")
+
+  # Resolve the actual branch the worktree is on
+  wt_branch=$(git -C "$wt_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
+  if [[ -z "$wt_branch" ]] || [[ "$wt_branch" == "HEAD" ]]; then
+    printf "  ${YELLOW}skip${RESET}  %-40s  (detached HEAD or unreadable)\n" "$branch"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  # Don't gc main/master
+  if [[ "$wt_branch" == "main" ]] || [[ "$wt_branch" == "master" ]]; then
+    continue
+  fi
+
+  # Check if branch is merged into origin/main
+  if ! git merge-base --is-ancestor "$wt_branch" origin/main 2>/dev/null; then
+    printf "  ${DIM}skip${RESET}  %-40s  (not merged into main)\n" "$branch"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  # Branch is merged — check for uncommitted changes as a safety net
+  if ! git -C "$wt_dir" diff --quiet 2>/dev/null ||
+     ! git -C "$wt_dir" diff --cached --quiet 2>/dev/null; then
+    printf "  ${YELLOW}skip${RESET}  %-40s  (merged but has uncommitted changes)\n" "$branch"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  # ── Clean it up ─────────────────────────────────────
+  printf "  ${RED}clean${RESET} %-40s  " "$branch"
+
+  # Remove pod + volumes if they exist
+  pod_name="worktree-${hash}"
+  if podman pod inspect "$pod_name" &>/dev/null; then
+    podman pod rm -f "$pod_name" 2>/dev/null || true
+    podman volume rm -f \
+      "worktree-${hash}-pgdata" \
+      "worktree-${hash}-node-modules" \
+      "worktree-${hash}-mix-build" \
+      "worktree-${hash}-mix-deps" \
+      2>/dev/null || true
+    printf "(pod + volumes + "
+  else
+    printf "("
+  fi
+
+  # Remove resolved secrets
+  rm -f "$wt_dir/.env.secrets.resolved"
+
+  # Remove git worktree
+  git worktree remove "$wt_dir" 2>/dev/null || \
+    git worktree remove --force "$wt_dir" 2>/dev/null || true
+
+  # Delete the local branch (it's merged, safe to delete)
+  git branch -d "$wt_branch" 2>/dev/null || true
+
+  printf "worktree + branch)\n"
+  cleaned=$((cleaned + 1))
+done
+
+# Prune any dangling worktree refs
+git worktree prune 2>/dev/null || true
+
+# Regenerate Caddy config if any pods were removed
+if [[ $cleaned -gt 0 ]] && [[ -x ./infra/local/caddy-regen.sh ]]; then
+  bash ./infra/local/caddy-regen.sh 2>/dev/null || true
+fi
+
+echo ""
+printf "${GREEN}Done.${RESET} Cleaned ${BOLD}%d${RESET} worktree(s), skipped %d.\n" "$cleaned" "$skipped"

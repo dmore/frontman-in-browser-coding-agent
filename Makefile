@@ -211,6 +211,7 @@ tunnel: ## Start SSH tunnel to DevPod server (fallback if dnsmasq not configured
 #   make wt-start BRANCH=...   Resume paused worktree
 #   make wt-sh    BRANCH=...   Shell into container
 #   make wt-rm    BRANCH=...   Full cleanup (pod + volumes + worktree)
+#   make wt-gc                 Remove worktrees for branches merged into main
 #   make wt-urls  BRANCH=...   Show service URLs
 #   make wt-logs  BRANCH=...   Tail container logs
 #
@@ -226,7 +227,7 @@ DEV_IMAGE := frontman-dev:latest
 export MD5CMD := $(shell if command -v md5sum >/dev/null 2>&1; then echo 'md5sum | cut -c1-4'; else echo 'md5 | cut -c1-4'; fi)
 
 ## WT_START
-.PHONY: wt wt-new wt-dev wt-stop wt-start wt-sh wt-rm wt-urls wt-logs
+.PHONY: wt wt-new wt-dev wt-stop wt-start wt-sh wt-rm wt-gc wt-urls wt-logs
 
 wt: ## Dashboard — shows all worktrees, pod status, URLs, and actions
 	@bash ./bin/wt-dashboard
@@ -275,6 +276,9 @@ wt-sh: ## Shell into dev container (BRANCH=...)
 wt-rm: ## Full cleanup: pod + volumes + worktree (BRANCH=...)
 	$(call resolve_branch,wt-rm)
 	@BRANCH="$(BRANCH)" bash ./bin/wt-pod-remove
+
+wt-gc: ## Remove worktrees whose branches are merged into main
+	@bash ./bin/wt-gc
 
 wt-urls: ## Show service URLs for a worktree (BRANCH=...)
 	$(call resolve_branch,wt-urls)
