@@ -11,7 +11,7 @@ You are in Cursor. You ask the agent to fix a visual bug — a card component th
 
 This is not a knock on Cursor. Cursor is excellent at code problems. The issue is that you used a file-level agent for a _visual_ problem, and file-level agents are blind to the rendered UI.
 
-![Table comparing file-level AI agents and browser-level AI agents across key capabilities: file access, terminal access, DOM access, computed styles, and visual verification.](/blog/post-06.png)
+!Table comparing file-level AI agents and browser-level AI agents across key capabilities: file access, terminal access, DOM access, computed styles, and visual verification.
 
 ### File-Level Agents Are For Code Problems
 

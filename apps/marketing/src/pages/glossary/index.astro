@@ -1,0 +1,124 @@
+---
+import Layout from '../../layouts/Layout.astro'
+import Section from '../../components/ui/Section.astro'
+import Row from '../../components/ui/Row.astro'
+import Col from '../../components/ui/Col.astro'
+import { getCollection } from 'astro:content'
+
+const SEO = {
+	title: 'Frontend Glossary | Frontman',
+	description:
+		'A comprehensive glossary of frontend development terms — from Virtual DOM to WebAssembly. Clear definitions for developers, engineering managers, and tech leads.'
+}
+
+const entries = await getCollection('glossary')
+const sorted = entries.sort((a, b) => a.data.title.localeCompare(b.data.title))
+
+const grouped = new Map<string, typeof sorted>()
+for (const entry of sorted) {
+	const letter = entry.data.title[0].toUpperCase()
+	if (!grouped.has(letter)) grouped.set(letter, [])
+	grouped.get(letter)!.push(entry)
+}
+const letters = [...grouped.keys()].sort()
+
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'DefinedTermSet',
+	name: 'Frontend Development Glossary',
+	description: SEO.description,
+	url: 'https://frontman.sh/glossary',
+	numberOfItems: entries.length
+}
+---
+
+<Layout title={SEO.title} description={SEO.description}>
+	<script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+	<Section id="glossary-hero" classes="bg-neutral-50 dark:bg-neutral-900">
+		<Row>
+			<Col span="12" align="center">
+				<h1 class="glossary-hero__title">Frontend Glossary</h1>
+				<p class="glossary-hero__description">
+					{entries.length} terms covering frontend development, performance, security, SEO, and
+					more.
+				</p>
+			</Col>
+		</Row>
+	</Section>
+
+	<Section id="glossary-index" padding="top">
+		<Row>
+			<Col span="12">
+				<nav class="glossary-nav" aria-label="Glossary alphabet">
+					{
+						letters.map((letter) => (
+							<a href={`#${letter}`} class="glossary-nav__letter">
+								{letter}
+							</a>
+						))
+					}
+				</nav>
+			</Col>
+		</Row>
+	</Section>
+
+	<Section id="glossary-list" padding="bottom">
+		<Row>
+			<Col span="12">
+				{
+					letters.map((letter) => (
+						<div class="glossary-group" id={letter}>
+							<h2 class="glossary-group__letter">{letter}</h2>
+							<ul class="glossary-group__list">
+								{grouped.get(letter)!.map((entry) => (
+									<li>
+										<a href={`/glossary/${entry.id}`} class="glossary-term">
+											<span class="glossary-term__title">{entry.data.title}</span>
+											<span class="glossary-term__description">
+												{entry.data.description}
+											</span>
+										</a>
+									</li>
+								))}
+							</ul>
+						</div>
+					))
+				}
+			</Col>
+		</Row>
+	</Section>
+</Layout>
+
+<style>
+	.glossary-hero__title {
+		@apply text-4xl font-bold lg:text-6xl;
+	}
+	.glossary-hero__description {
+		@apply mt-4 text-lg leading-relaxed text-neutral-500 dark:text-neutral-400;
+	}
+	.glossary-nav {
+		@apply flex flex-wrap justify-center gap-2;
+	}
+	.glossary-nav__letter {
+		@apply flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-200 font-headings text-sm font-semibold text-neutral-700 transition-colors hover:border-primary-500 hover:bg-primary-50 hover:text-primary-600 dark:border-neutral-700 dark:text-neutral-200 dark:hover:border-primary-400 dark:hover:bg-primary-950 dark:hover:text-primary-400;
+	}
+	.glossary-group {
+		@apply mb-12;
+	}
+	.glossary-group__letter {
+		@apply mb-4 border-b border-neutral-200 pb-2 text-2xl font-bold dark:border-neutral-700;
+	}
+	.glossary-group__list {
+		@apply grid gap-3 sm:grid-cols-2 lg:grid-cols-3;
+	}
+	.glossary-term {
+		@apply flex flex-col rounded-lg border border-neutral-200 p-4 transition-all hover:border-primary-300 hover:shadow-sm dark:border-neutral-700 dark:hover:border-primary-600;
+	}
+	.glossary-term__title {
+		@apply font-headings font-semibold text-neutral-700 dark:text-neutral-100;
+	}
+	.glossary-term__description {
+		@apply mt-1 line-clamp-2 text-sm text-neutral-500 dark:text-neutral-400;
+	}
+</style>

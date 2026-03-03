@@ -1,0 +1,56 @@
+---
+const { frontmatter } = Astro.props
+
+import Layout from './Layout.astro'
+import Section from '../components/ui/Section.astro'
+import Row from '../components/ui/Row.astro'
+import Col from '../components/ui/Col.astro'
+import Breadcrumbs from '../components/ui/Breadcrumbs.astro'
+
+const SEO = {
+	title: `${frontmatter.title} | Frontman Glossary`,
+	description: frontmatter.description
+}
+
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'DefinedTerm',
+	name: frontmatter.title,
+	description: frontmatter.description,
+	inDefinedTermSet: {
+		'@type': 'DefinedTermSet',
+		name: 'Frontend Development Glossary',
+		url: 'https://frontman.sh/glossary'
+	},
+	url: Astro.url.href
+}
+---
+
+<Layout title={SEO.title} description={SEO.description}>
+	<script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+	<Section id="glossary-hero" classes="bg-neutral-50 dark:bg-neutral-900">
+		<Row>
+			<Col span="12" align="center">
+				<header class="glossary-header">
+					<Breadcrumbs classes="mb-6" />
+					<h1 class="glossary-header__title">{frontmatter.title}</h1>
+					<p class="glossary-header__description">{frontmatter.description}</p>
+				</header>
+			</Col>
+		</Row>
+	</Section>
+
+	<div class="glossary-body basic-text basic-text--lg">
+		<slot />
+	</div>
+</Layout>
+
+<style>
+	.glossary-header__description {
+		@apply text-lg leading-relaxed text-neutral-500 dark:text-neutral-400;
+	}
+	.glossary-body {
+		@apply mx-auto max-w-3xl px-6 py-12 lg:py-24;
+	}
+</style>
