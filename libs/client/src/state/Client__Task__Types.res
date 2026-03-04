@@ -1,6 +1,10 @@
 // Task domain types - extracted from Client__State__Types for modularity
 S.enableJson()
 
+module Log = FrontmanLogs.Logs.Make({
+  let component = #TaskReducer
+})
+
 // Re-export Message types for backward compatibility
 module UserContentPart = Client__Message.UserContentPart
 module AssistantContentPart = Client__Message.AssistantContentPart
@@ -865,23 +869,44 @@ let currentPageToContentBlock = (previewFrame: Task.previewFrame): ACPTypes.cont
   let url = previewFrame.url
 
   // Read viewport and display info from iframe's contentWindow
+  // Wrapped in try/catch because the iframe may be cross-origin in
+  // containerized worktrees (different subdomains), causing SecurityError.
   let (viewportWidth, viewportHeight, dpr, scrollY) = switch previewFrame.contentWindow {
-  | Some(win) => (
-      Some(win.innerWidth),
-      Some(win.innerHeight),
-      Some(win.devicePixelRatio),
-      Some(win.scrollY->Float.toInt),
-    )
+  | Some(win) =>
+    try {
+      (
+        Some(win.innerWidth),
+        Some(win.innerHeight),
+        Some(win.devicePixelRatio),
+        Some(win.scrollY->Float.toInt),
+      )
+    } catch {
+    | exn =>
+      Log.warning(
+        ~ctx={"error": exn, "url": previewFrame.url},
+        "Cross-origin SecurityError reading iframe viewport/display info",
+      )
+      (None, None, None, None)
+    }
   | None => (None, None, None, None)
   }
 
   // Read page title from iframe's contentDocument
   let title = switch previewFrame.contentDocument {
   | Some(doc) =>
-    let t = getDocumentTitle(doc)
-    switch t {
-    | "" => None
-    | value => Some(value)
+    try {
+      let t = getDocumentTitle(doc)
+      switch t {
+      | "" => None
+      | value => Some(value)
+      }
+    } catch {
+    | exn =>
+      Log.warning(
+        ~ctx={"error": exn, "url": previewFrame.url},
+        "Cross-origin SecurityError reading iframe document title",
+      )
+      None
     }
   | None => None
   }
