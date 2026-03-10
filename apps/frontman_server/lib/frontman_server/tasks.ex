@@ -303,7 +303,8 @@ defmodule FrontmanServer.Tasks do
           {:ok, Interaction.t()} | {:error, Ecto.Changeset.t()}
   defp append_interaction(%TaskSchema{id: task_id}, interaction) do
     case InteractionSchema.create_changeset(task_id, interaction) |> Repo.insert() do
-      {:ok, _schema} ->
+      {:ok, schema} ->
+        interaction = %{interaction | sequence: schema.sequence}
         touch_task(task_id)
         broadcast_task(task_id, {:interaction, interaction})
         {:ok, interaction}

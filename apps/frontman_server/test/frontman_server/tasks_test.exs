@@ -1,6 +1,8 @@
 defmodule FrontmanServer.TasksTest do
   use FrontmanServer.DataCase, async: false
 
+  import FrontmanServer.InteractionCase.Helpers
+
   alias FrontmanServer.Accounts
   alias FrontmanServer.Accounts.Scope
   alias FrontmanServer.Tasks
@@ -173,6 +175,84 @@ defmodule FrontmanServer.TasksTest do
       assistant_messages = Enum.filter(messages, &(&1.role == :assistant))
       assert length(assistant_messages) == 2
     end
+
+    test "full tool_call + tool_result round-trip produces valid LLM messages", %{scope: scope} do
+      task_id = Ecto.UUID.generate()
+      {:ok, ^task_id} = Tasks.create_task(scope, task_id, "nextjs")
+
+      tool_call_id = "toolu_integration_#{System.unique_integer([:positive])}"
+
+      # 1. User asks a question
+      {:ok, _} =
+        Tasks.add_user_message(
+          scope,
+          task_id,
+          [%{"type" => "text", "text" => "What is 2+2?"}],
+          []
+        )
+
+      # 2. Agent responds with a tool_call in metadata (OpenAI wire format, as stored in DB)
+      {:ok, _} =
+        Tasks.add_agent_response(scope, task_id, "Let me calculate that.", %{
+          "tool_calls" => [
+            %{
+              "id" => tool_call_id,
+              "type" => "function",
+              "function" => %{
+                "name" => "calculator",
+                "arguments" => ~s({"expression": "2+2"})
+              }
+            }
+          ]
+        })
+
+      # 3. ToolCall interaction (the LLM's raw tool invocation record)
+      tc = ReqLLM.ToolCall.new(tool_call_id, "calculator", ~s({"expression": "2+2"}))
+      {:ok, _} = Tasks.add_tool_call(scope, task_id, tc)
+
+      # 4. ToolResult interaction (the tool's response)
+      {:ok, _} =
+        Tasks.add_tool_result(scope, task_id, %{id: tool_call_id, name: "calculator"}, "4", false)
+
+      # 5. Agent sends final answer
+      {:ok, _} = Tasks.add_agent_response(scope, task_id, "The answer is 4.")
+
+      # --- Verify interactions have correct monotonic sequences ---
+      {:ok, interactions} = Tasks.get_interactions(scope, task_id)
+      sequences = Enum.map(interactions, & &1.sequence)
+
+      assert length(sequences) == 5
+      assert sequences == Enum.sort(sequences), "sequences should be strictly increasing"
+      assert sequences == Enum.uniq(sequences), "sequences should be unique"
+
+      # --- Verify LLM messages are valid for Anthropic ---
+      {:ok, messages} = Tasks.get_llm_messages(scope, task_id)
+
+      # to_llm_messages skips ToolCall interactions (they're redundant with agent_response metadata)
+      # Expected: user -> assistant(with tool_calls) -> tool -> assistant
+      assert length(messages) == 4,
+             "expected 4 LLM messages, got #{length(messages)}: #{inspect(Enum.map(messages, & &1.role))}"
+
+      [user_msg, assistant_with_tool, tool_result_msg, final_assistant] = messages
+
+      # Roles must be in valid Anthropic order
+      assert user_msg.role == :user
+      assert assistant_with_tool.role == :assistant
+      assert tool_result_msg.role == :tool
+      assert final_assistant.role == :assistant
+
+      # The assistant message must include the tool_call with matching ID
+      assert [%ReqLLM.ToolCall{} = tc_in_msg] = assistant_with_tool.tool_calls
+      assert tc_in_msg.id == tool_call_id
+      assert tc_in_msg.function.name == "calculator"
+
+      # The tool result must reference the same tool_call_id
+      assert tool_result_msg.tool_call_id == tool_call_id
+      assert [%{type: :text, text: "4"}] = tool_result_msg.content
+
+      # Final assistant should have the answer
+      assert [%{type: :text, text: "The answer is 4."}] = final_assistant.content
+    end
   end
 
   describe "add_tool_call/3" do
@@ -237,6 +317,88 @@ defmodule FrontmanServer.TasksTest do
       # The tool result should have been stored successfully
       {:ok, interactions} = Tasks.get_interactions(scope, task_id)
       assert length(interactions) == 1
+    end
+  end
+
+  describe "append_interaction sequence assignment" do
+    test "assigns monotonically increasing sequences", %{scope: scope} do
+      task_id = Ecto.UUID.generate()
+      {:ok, ^task_id} = Tasks.create_task(scope, task_id, "nextjs")
+
+      {:ok, msg1} =
+        Tasks.add_user_message(scope, task_id, [%{"type" => "text", "text" => "hello"}], [])
+
+      {:ok, msg2} = Tasks.add_agent_response(scope, task_id, "hi there")
+
+      {:ok, msg3} =
+        Tasks.add_user_message(scope, task_id, [%{"type" => "text", "text" => "again"}], [])
+
+      assert msg1.sequence > 0
+      assert msg2.sequence > msg1.sequence
+      assert msg3.sequence > msg2.sequence
+    end
+
+    test "sequences survive struct creation with default 0", %{scope: scope} do
+      task_id = Ecto.UUID.generate()
+      {:ok, ^task_id} = Tasks.create_task(scope, task_id, "nextjs")
+
+      # The struct starts with sequence 0, but after append_interaction
+      # it should have a proper sequence assigned by the DB
+      {:ok, interaction} = Tasks.add_agent_response(scope, task_id, "content")
+      assert interaction.sequence > 0
+    end
+
+    test "concurrent inserts produce unique, sortable sequences", %{scope: scope} do
+      task_id = Ecto.UUID.generate()
+      {:ok, ^task_id} = Tasks.create_task(scope, task_id, "nextjs")
+
+      # Spawn 20 concurrent processes all inserting interactions for the same task.
+      # With the old MAX(sequence)+1 approach, concurrent readers would see the same
+      # MAX and produce duplicate sequences. The timestamp+monotonic approach must
+      # guarantee every sequence is unique.
+      results =
+        1..20
+        |> Task.async_stream(
+          fn i ->
+            Tasks.add_agent_response(scope, task_id, "concurrent msg #{i}")
+          end,
+          max_concurrency: 20,
+          timeout: :infinity
+        )
+        |> Enum.map(fn {:ok, {:ok, interaction}} -> interaction.sequence end)
+
+      assert length(results) == 20
+      assert results == Enum.uniq(results), "sequences must be unique, got duplicates"
+
+      # When read back from DB, the ordered query should return all 20 in sorted order
+      {:ok, interactions} = Tasks.get_interactions(scope, task_id)
+      db_sequences = Enum.map(interactions, & &1.sequence)
+
+      assert length(db_sequences) == 20
+      assert db_sequences == Enum.sort(db_sequences), "DB ordering must be sorted"
+      assert db_sequences == Enum.uniq(db_sequences), "DB sequences must be unique"
+    end
+
+    test "sequences are consistent when read back from DB", %{scope: scope} do
+      task_id = Ecto.UUID.generate()
+      {:ok, ^task_id} = Tasks.create_task(scope, task_id, "nextjs")
+
+      {:ok, _} =
+        Tasks.add_user_message(scope, task_id, [%{"type" => "text", "text" => "msg1"}], [])
+
+      {:ok, _} = Tasks.add_agent_response(scope, task_id, "response1")
+
+      tool_call_data = %{id: "tc_1", name: "test_tool"}
+      {:ok, _} = Tasks.add_tool_result(scope, task_id, tool_call_data, "result", false)
+
+      {:ok, interactions} = Tasks.get_interactions(scope, task_id)
+      sequences = Enum.map(interactions, & &1.sequence)
+
+      # Sequences should be strictly increasing
+      assert sequences == Enum.sort(sequences)
+      assert length(sequences) == 3
+      assert Enum.all?(sequences, &(&1 > 0))
+      assert sequences == Enum.uniq(sequences)
     end
   end
 
@@ -426,46 +588,10 @@ defmodule FrontmanServer.TasksTest do
       task_id = Ecto.UUID.generate()
       {:ok, ^task_id} = Tasks.create_task(scope, task_id, "nextjs")
 
-      # Content blocks matching the new annotation ACP format:
-      # 1. Text message
-      # 2. Resource with annotation _meta
-      # 3. Resource with annotation_screenshot blob
       content_blocks = [
-        %{"type" => "text", "text" => "Fix the button"},
-        %{
-          "type" => "resource",
-          "resource" => %{
-            "_meta" => %{
-              "annotation" => true,
-              "annotation_index" => 0,
-              "annotation_id" => "ann-test-1",
-              "tag_name" => "button",
-              "file" => "src/components/Button.tsx",
-              "line" => 42,
-              "column" => 5
-            },
-            "resource" => %{
-              "uri" => "file://src/components/Button.tsx:42:5",
-              "mimeType" => "text/plain",
-              "text" => "Annotated element: <button> at src/components/Button.tsx:42:5"
-            }
-          }
-        },
-        %{
-          "type" => "resource",
-          "resource" => %{
-            "_meta" => %{
-              "annotation_screenshot" => true,
-              "annotation_index" => 0,
-              "annotation_id" => "ann-test-1"
-            },
-            "resource" => %{
-              "uri" => "annotation://ann-test-1/screenshot",
-              "mimeType" => "image/png",
-              "blob" => "iVBORw0KGgoAAAANSUhEUg=="
-            }
-          }
-        }
+        text_block("Fix the button"),
+        annotation_block("ann-test-1", "button", "src/components/Button.tsx", 42, 5),
+        screenshot_block("ann-test-1", "iVBORw0KGgoAAAANSUhEUg==")
       ]
 
       {:ok, _interaction} = Tasks.add_user_message(scope, task_id, content_blocks, [])
@@ -500,15 +626,6 @@ defmodule FrontmanServer.TasksTest do
 
       assert [_ | _] = image_parts
     end
-  end
-
-  defp extract_content_text(content) when is_binary(content), do: content
-
-  defp extract_content_text(content) when is_list(content) do
-    Enum.map_join(content, "", fn
-      %{text: text} -> text
-      _ -> ""
-    end)
   end
 
   describe "list_todos/2" do
