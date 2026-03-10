@@ -3,7 +3,6 @@ import type { APIRoute } from 'astro'
 const robotsTxt = `
 User-agent: *
 Allow: /
-Disallow: /glossary/
 
 # AI crawlers — explicitly allowed so Frontman appears in AI-generated answers
 User-agent: GPTBot
