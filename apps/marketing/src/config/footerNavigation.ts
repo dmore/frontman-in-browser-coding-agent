@@ -104,6 +104,19 @@ export const footerNavigationData: FooterData = {
 			]
 		},
 		{
+			category: 'Resources',
+			subCategories: [
+				{
+					subCategory: 'Lighthouse Guides',
+					subCategoryLink: '/lighthouse/'
+				},
+				{
+					subCategory: 'Glossary',
+					subCategoryLink: '/glossary/'
+				}
+			]
+		},
+		{
 			category: 'Developers',
 			subCategories: [
 				{
