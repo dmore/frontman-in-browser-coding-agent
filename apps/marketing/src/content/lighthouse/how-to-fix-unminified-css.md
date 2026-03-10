@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags "Minify CSS," it means your stylesheets contain whitespace, comments, and verbose syntax that add unnecessary bytes. CSS is [render-blocking](/lighthouse/how-to-fix-render-blocking-resources/) by default — every extra byte delays [First Contentful Paint](/lighthouse/how-to-fix-first-contentful-paint-fcp/).
+When Lighthouse flags "Minify [CSS](https://developer.mozilla.org/en-US/docs/Web/CSS)," it means your stylesheets contain whitespace, comments, and verbose syntax that add unnecessary bytes. CSS is [render-blocking](/lighthouse/how-to-fix-render-blocking-resources/) by default — every extra byte delays [First Contentful Paint](/lighthouse/how-to-fix-first-contentful-paint-fcp/).
 
 Lighthouse shows the potential byte savings for each unminified CSS file.
 
@@ -56,7 +56,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 ### What is the difference between CSS minification and CSS purging?
 
-Minification removes whitespace and comments from the CSS you use. Purging ([unused CSS removal](/lighthouse/how-to-fix-unused-css/)) removes entire rules that are never applied. They solve different problems — purging reduces the number of rules, minification compresses each rule.
+[Minification](https://en.wikipedia.org/wiki/Minification_(programming)) removes whitespace and comments from the CSS you use. Purging ([unused CSS removal](/lighthouse/how-to-fix-unused-css/)) removes entire rules that are never applied. They solve different problems — purging reduces the number of rules, minification compresses each rule.
 
 ### Does Tailwind CSS minify automatically?
 

@@ -18,13 +18,13 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags "Document does not have a `<title>` element," the page is missing a `<title>` tag in `<head>` — or the tag is present but empty. This audit appears in both the **SEO** and **Accessibility** categories.
+When Lighthouse flags "Document does not have a [`<title>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/title) element," the page is missing a `<title>` tag in `<head>` — or the tag is present but empty. This audit appears in both the **SEO** and **Accessibility** categories.
 
 Without a title, the browser tab shows the URL. Search engines have no headline for the result. Screen readers cannot announce what page the user is on.
 
 ## Why the Title Matters
 
-- **Search engine results** — The title is typically the clickable headline in Google, Bing, and other search results. It is the strongest on-page SEO signal for relevance
+- **Search engine results** — The title is typically the clickable headline in Google, Bing, and other search results. Google's [title link documentation](https://developers.google.com/search/docs/appearance/title-link) explains how titles appear in results. It is the strongest on-page SEO signal for relevance
 - **Browser tabs** — Users with multiple tabs open use the title to find the right tab. A missing title shows a truncated URL
 - **Screen readers** — The `<title>` is the first element announced when a user opens or navigates to a page
 - **Social sharing** — The title appears in link previews on Twitter/X, Facebook, Slack, and other platforms (via `<meta property="og:title">`, which falls back to `<title>`)

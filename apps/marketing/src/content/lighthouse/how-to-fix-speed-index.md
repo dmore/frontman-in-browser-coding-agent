@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags Speed Index, it means the page's visible content is populating slowly. Speed Index carries a **weight of 10** in the Performance score. Unlike metrics that measure a single moment ([FCP](/lighthouse/how-to-fix-first-contentful-paint-fcp/) or [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/)), Speed Index captures how quickly the *entire viewport* becomes visually complete. A page that shows content progressively scores better than one that stays blank for three seconds and then renders everything at once.
+When Lighthouse flags [Speed Index](https://web.dev/articles/speed-index), it means the page's visible content is populating slowly. Speed Index carries a **weight of 10** in the Performance score. Unlike metrics that measure a single moment ([FCP](/lighthouse/how-to-fix-first-contentful-paint-fcp/) or [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/)), Speed Index captures how quickly the *entire viewport* becomes visually complete. A page that shows content progressively scores better than one that stays blank for three seconds and then renders everything at once.
 
 Lighthouse calculates Speed Index by capturing video frames of the page loading and computing the area under the visual progress curve.
 
@@ -51,7 +51,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 - **Eliminate [render-blocking resources](/lighthouse/how-to-fix-render-blocking-resources/)** — Inline critical CSS, defer non-critical CSS and JavaScript
 - **Optimize above-the-fold images** — Compress, serve in modern formats (WebP/AVIF), and set explicit dimensions
-- **Use `font-display: swap`** — Show text immediately with a fallback font instead of hiding it
+- **Use [`font-display: swap`](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display)** — Show text immediately with a fallback font instead of hiding it
 - **Server-side render or statically generate** — Send pre-rendered HTML so the browser can start painting without waiting for JavaScript
 - **Reduce main thread blocking** — [Cut TBT](/lighthouse/how-to-fix-total-blocking-time-tbt/) to let the browser render frames between JavaScript tasks
 - **Preload key resources** — `<link rel="preload">` for fonts, hero images, and critical scripts
@@ -72,7 +72,7 @@ Yes. Skeleton screens paint placeholder shapes immediately, which increases the 
 
 ### How does HTTP/2 affect Speed Index?
 
-HTTP/2 multiplexes multiple requests over a single connection, allowing the browser to download CSS, JavaScript, and images simultaneously. This speeds up visual progress compared to HTTP/1.1, which downloads resources sequentially per connection.
+[HTTP/2](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Connection_management_in_HTTP_1.x) multiplexes multiple requests over a single connection, allowing the browser to download CSS, JavaScript, and images simultaneously. This speeds up visual progress compared to HTTP/1.1, which downloads resources sequentially per connection.
 
 ---
 

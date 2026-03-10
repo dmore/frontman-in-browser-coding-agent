@@ -55,8 +55,8 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 ## Key Fixes
 
 - **Always set `width` and `height`** — Even for responsive images. The browser uses these to calculate the aspect ratio and reserve space. Add `style="max-width: 100%; height: auto"` for responsive behavior
-- **Use `srcset` and `sizes`** — Let the browser choose the right image size: `<img srcset="photo-400.webp 400w, photo-800.webp 800w, photo-1200.webp 1200w" sizes="(max-width: 600px) 100vw, 50vw">`
-- **Serve WebP with JPEG fallback** — Use `<picture>` for format switching: `<picture><source srcset="photo.webp" type="image/webp"><img src="photo.jpg"></picture>`
+- **Use [`srcset`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/img#srcset) and `sizes`** — Let the browser choose the right image size: `<img srcset="photo-400.webp 400w, photo-800.webp 800w, photo-1200.webp 1200w" sizes="(max-width: 600px) 100vw, 50vw">`
+- **Serve WebP with JPEG fallback** — Use [`<picture>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/picture) for format switching: `<picture><source srcset="photo.webp" type="image/webp"><img src="photo.jpg"></picture>`
 - **Use framework image components** — `next/image` (Next.js), `astro:image` (Astro), and `@nuxt/image` handle resizing, format conversion, and responsive attributes automatically
 - **Compress aggressively** — Quality 75-80 for JPEG/WebP is nearly indistinguishable from 100 to the human eye but 40-50% smaller
 - **Lazy load below-the-fold images** — `loading="lazy"` defers off-screen images. Never lazy-load the [LCP element](/lighthouse/how-to-fix-largest-contentful-paint-lcp/)

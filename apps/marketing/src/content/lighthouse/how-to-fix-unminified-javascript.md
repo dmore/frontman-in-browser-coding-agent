@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags "Minify JavaScript," it means your JavaScript files contain whitespace, comments, and full-length variable names that add unnecessary bytes. These extra bytes increase download time and parse time. Lighthouse shows the potential savings for each unminified file.
+When Lighthouse flags "Minify JavaScript," it means your [`<script>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script) files contain whitespace, comments, and full-length variable names that add unnecessary bytes. These extra bytes increase download time and parse time. Lighthouse shows the potential savings for each unminified file.
 
 This audit directly affects [Total Blocking Time](/lighthouse/how-to-fix-total-blocking-time-tbt/) (larger files take longer to parse) and [First Contentful Paint](/lighthouse/how-to-fix-first-contentful-paint-fcp/) (if the script is render-blocking).
 
@@ -59,7 +59,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 ### How much does minification save?
 
-Typical savings are 30–60% of file size. A 200 KB unminified bundle typically becomes 80–120 KB after minification. Combined with Brotli compression, the transfer size can drop to 30–50 KB.
+Typical savings are 30–60% of file size. A 200 KB unminified bundle typically becomes 80–120 KB after [minification](https://en.wikipedia.org/wiki/Minification_(programming)). Combined with Brotli compression, the transfer size can drop to 30–50 KB.
 
 ### Does minification affect runtime performance?
 

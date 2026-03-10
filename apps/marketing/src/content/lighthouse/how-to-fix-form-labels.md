@@ -47,7 +47,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 ## Key Fixes
 
-- **Use `<label>` with `for` attribute** — The most reliable method: `<label for="email">Email</label> <input id="email" type="email">`
+- **Use [`<label>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/label) with `for` attribute** — The most reliable method: `<label for="email">Email</label> <input id="email" type="email">`
 - **Or wrap the input in a `<label>`** — `<label>Email <input type="email"></label>` — the association is implicit
 - **Use `aria-label` for visually hidden labels** — `<input type="search" aria-label="Search products">` when you need a label without visible text
 - **Use `aria-labelledby` for complex labels** — When the label text comes from another element: `<input aria-labelledby="price-label currency-label">`
@@ -62,7 +62,7 @@ The `title` attribute is recognized as a label by Lighthouse, but it is the lowe
 
 ### Do radio buttons and checkboxes need labels?
 
-Yes. Each radio button and checkbox needs its own `<label>`. Additionally, a group of radio buttons should be wrapped in a `<fieldset>` with a `<legend>` to describe the group. Example: `<fieldset><legend>Shipping method</legend>...radios...</fieldset>`.
+Yes. Each radio button and checkbox needs its own `<label>`. Additionally, a group of radio buttons should be wrapped in a [`<fieldset>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/fieldset) with a `<legend>` to describe the group. Example: `<fieldset><legend>Shipping method</legend>...radios...</fieldset>`.
 
 ### How do I label a select element?
 

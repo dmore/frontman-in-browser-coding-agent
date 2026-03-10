@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags "Background and foreground colors do not have a sufficient contrast ratio," it means text on the page is hard to read because the color difference between the text and its background is too low. This is a **weight-7 accessibility audit** that directly affects readability for everyone — not just users with vision impairments.
+When Lighthouse flags "[Background and foreground colors do not have a sufficient contrast ratio](https://developer.mozilla.org/en-US/docs/Web/Accessibility/Understanding_WCAG/Perceivable/Color_contrast)," it means text on the page is hard to read because the color difference between the text and its background is too low. This is a **weight-7 accessibility audit** that directly affects readability for everyone — not just users with vision impairments.
 
 Lighthouse tests every text element on the page and reports those that fail the WCAG 2.1 Level AA contrast ratio thresholds.
 
@@ -26,7 +26,7 @@ Lighthouse tests every text element on the page and reports those that fail the 
 
 - **1 in 12 men and 1 in 200 women** have some form of color vision deficiency
 - **Low contrast** is the most common accessibility barrier on the web — it affects users with low vision, aging eyes, bright screens, and outdoor mobile use
-- **WCAG compliance** — Level AA contrast requirements are a legal requirement in many jurisdictions under the ADA (US), EN 301 549 (EU), and similar laws
+- **[WCAG compliance](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum.html)** — Level AA contrast requirements are a legal requirement in many jurisdictions under the ADA (US), EN 301 549 (EU), and similar laws
 - **Readability** — Even users with perfect vision read low-contrast text slower and with more errors
 
 ## The Old Way to Fix It

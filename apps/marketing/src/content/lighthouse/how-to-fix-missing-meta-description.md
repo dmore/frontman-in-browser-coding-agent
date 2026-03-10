@@ -18,12 +18,12 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags "Document does not have a meta description," it means the page is missing the `<meta name="description" content="...">` tag in `<head>`. This is an SEO audit — without a meta description, you leave the search result snippet entirely up to Google's auto-generation, which often produces suboptimal excerpts.
+When Lighthouse flags "Document does not have a meta description," it means the page is missing the [`<meta name="description">`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta) tag in `<head>`. This is an SEO audit — without a meta description, you leave the search result snippet entirely up to Google's auto-generation, which often produces suboptimal excerpts.
 
 ## Why Meta Descriptions Matter
 
 - **Search result snippets** — Google displays the meta description as the preview text below the page title. A well-written description tells users what the page contains before they click
-- **Click-through rate** — Pages with compelling, relevant descriptions get more clicks than those with auto-generated snippets
+- **Click-through rate** — Pages with compelling, relevant descriptions get more clicks than those with auto-generated snippets. Google's [meta description documentation](https://developers.google.com/search/docs/appearance/snippet) explains how snippets are generated
 - **Social sharing** — When someone shares your URL on social media or Slack, the meta description often appears as the preview text
 - **User intent matching** — A clear description helps users decide if the page matches what they are looking for, reducing bounce rates
 

@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags Largest Contentful Paint, it means the biggest visible element in the viewport took too long to render. LCP carries a **weight of 25** in the Lighthouse Performance score — the second-heaviest metric after [Total Blocking Time](/lighthouse/how-to-fix-total-blocking-time-tbt/). A slow LCP drags the entire Performance category.
+When Lighthouse flags Largest Contentful Paint, it means the biggest visible element in the viewport took too long to render. LCP carries a **weight of 25** in the [Lighthouse Performance score](https://web.dev/articles/lcp) — the second-heaviest metric after [Total Blocking Time](/lighthouse/how-to-fix-total-blocking-time-tbt/). A slow LCP drags the entire Performance category.
 
 The LCP element is usually a hero image, a large heading, or a video poster frame. Lighthouse tells you which element it picked and how long it took to paint.
 
@@ -61,8 +61,8 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 ## Key Fixes for LCP
 
-- **Preload the LCP image** — Add `<link rel="preload" as="image" href="...">` in `<head>` so the browser discovers it immediately
-- **Use `fetchpriority="high"`** — Tells the browser to prioritize this image over other resources
+- **Preload the LCP image** — Add [`<link rel="preload">`](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel/preload) with `as="image"` in `<head>` so the browser discovers it immediately
+- **Use [`fetchpriority="high"`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/img#fetchpriority)** — Tells the browser to prioritize this image over other resources
 - **Serve modern formats** — WebP is 25–35% smaller than JPEG. AVIF is 50% smaller. Use `<picture>` with fallbacks
 - **Remove lazy loading on hero images** — `loading="lazy"` on above-the-fold images delays LCP
 - **Inline critical CSS** — [Render-blocking CSS](/lighthouse/how-to-fix-render-blocking-resources/) delays the first paint, which delays LCP

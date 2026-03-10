@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags "Buttons do not have an accessible name," it means one or more `<button>` elements (or elements with `role="button"`) have no text that screen readers can announce. This is a **weight-10 accessibility audit** — the highest severity. A screen reader user encounters these buttons as just "button" with no indication of what they do.
+When Lighthouse flags "Buttons do not have an accessible name," it means one or more [`<button>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/button) elements (or elements with `role="button"`) have no text that screen readers can announce. This is a **weight-10 accessibility audit** — the highest severity. A screen reader user encounters these buttons as just "button" with no indication of what they do.
 
 ## Why Buttons Are Missing Names
 
@@ -49,7 +49,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 ## Key Fixes
 
 - **Add visible text when possible** — `<button><SearchIcon /> Search</button>` is better than an icon-only button because all users can read the label
-- **Use `aria-label` for icon-only buttons** — `<button aria-label="Close"><CloseIcon /></button>` gives screen readers a name without visible text
+- **Use [`aria-label`](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-label) for icon-only buttons** — `<button aria-label="Close"><CloseIcon /></button>` gives screen readers a name without visible text
 - **Use `aria-labelledby`** for complex buttons — When the label text exists elsewhere on the page, point to it: `<button aria-labelledby="cart-count">` where `<span id="cart-count">3 items in cart</span>`
 - **Add alt text to image buttons** — `<button><img src="search.svg" alt="Search"></button>`
 - **Use visually hidden text** as an alternative to aria-label — `<button><span class="sr-only">Close menu</span><CloseIcon /></button>` works with screen readers and translation tools

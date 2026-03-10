@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags "Links do not have a discernible name," it means one or more `<a>` elements have no text that screen readers can announce. This is a **weight-7 accessibility audit**. Screen reader users navigating by links hear "link" with no description of where it goes.
+When Lighthouse flags "Links do not have a discernible name," it means one or more [`<a>`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/a) elements have no text that screen readers can announce. This is a **weight-7 accessibility audit**. Screen reader users navigating by links hear "link" with no description of where it goes.
 
 Lighthouse checks for text content, `aria-label`, `aria-labelledby`, and `alt` text on contained images. If none exist, the link fails.
 
@@ -49,7 +49,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 - **Use descriptive visible text** — `<a href="/pricing">View pricing details</a>` is better than `<a href="/pricing">Click here</a>`
 - **Add alt text to image links** — `<a href="/"><img src="logo.svg" alt="Homepage"></a>`
-- **Use `aria-label` for icon links** — `<a href="https://twitter.com/..." aria-label="Follow us on Twitter"><TwitterIcon /></a>`
+- **Use [`aria-label`](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Attributes/aria-label) for icon links** — `<a href="https://twitter.com/..." aria-label="Follow us on Twitter"><TwitterIcon /></a>`
 - **Add context to generic links** — For "Read more" links, use `aria-label` to add context: `<a href="/blog/post" aria-label="Read more about performance optimization">Read more</a>`
 - **Use visually hidden text** — `<a href="/search"><span class="sr-only">Search</span><SearchIcon /></a>` provides an accessible name without changing the visual design
 - **Never use empty href** — `<a href="">` or `<a href="#">` with no text is meaningless to all users

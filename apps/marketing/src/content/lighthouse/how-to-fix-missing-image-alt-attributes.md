@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags "Image elements do not have `[alt]` attributes," it means one or more `<img>` tags on the page are missing the `alt` attribute entirely. This is a **weight-10 accessibility audit** — the highest weight in the Accessibility category. Missing alt text means screen reader users encounter images with no description, often hearing just the filename or URL.
+When Lighthouse flags "Image elements do not have [`[alt]`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/img#alt) attributes," it means one or more `<img>` tags on the page are missing the `alt` attribute entirely. This is a **weight-10 accessibility audit** — the highest weight in the Accessibility category. Missing alt text means screen reader users encounter images with no description, often hearing just the filename or URL.
 
 This audit also appears in the SEO category. Search engines use alt text to understand image content and context. Missing alt text means missed indexing opportunities.
 
@@ -27,7 +27,7 @@ This audit also appears in the SEO category. Search engines use alt text to unde
 - **Screen reader users** rely on alt text to understand what an image conveys. Without it, the screen reader reads the filename (`hero-banner-v3-final.jpg`) or nothing at all
 - **Search engines** index alt text to understand image content. Google Images relies on it for image search results
 - **Broken image fallback** — When an image fails to load, the browser shows the alt text in its place
-- **Legal compliance** — WCAG 2.1 Level A (guideline 1.1.1) requires text alternatives for all non-text content
+- **Legal compliance** — [WCAG 2.1 Level A (guideline 1.1.1)](https://www.w3.org/WAI/WCAG21/Understanding/non-text-content.html) requires text alternatives for all non-text content
 
 ## The Old Way to Fix It
 

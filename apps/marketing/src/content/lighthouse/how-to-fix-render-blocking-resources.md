@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags render-blocking resources, it means CSS files or synchronous JavaScript in the `<head>` are preventing the browser from painting anything on screen. The browser downloads these resources, parses them, and only then starts rendering — everything before that point is a blank white page.
+When Lighthouse flags [render-blocking resources](https://web.dev/articles/render-blocking-resources), it means CSS files or synchronous JavaScript in the `<head>` are preventing the browser from painting anything on screen. The browser downloads these resources, parses them, and only then starts rendering — everything before that point is a blank white page.
 
 This audit directly impacts [First Contentful Paint](/lighthouse/how-to-fix-first-contentful-paint-fcp/), [Speed Index](/lighthouse/how-to-fix-speed-index/), and [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/). Lighthouse lists the specific resources that block rendering and estimates the potential savings in milliseconds.
 
@@ -58,10 +58,10 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 - **Inline critical CSS** — Extract above-the-fold styles and put them in a `<style>` tag in `<head>`. Use tools like `critters` (for Webpack/Vite) or `critical` (standalone)
 - **Defer non-critical CSS** — Use `<link rel="stylesheet" href="styles.css" media="print" onload="this.media='all'">` to load CSS without blocking
-- **Add `defer` to scripts** — `<script src="app.js" defer>` downloads the script without blocking parsing and executes it after HTML is parsed
+- **Add [`defer`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script#defer) to scripts** — `<script src="app.js" defer>` downloads the script without blocking parsing and executes it after HTML is parsed
 - **Use `async` for independent scripts** — `<script src="analytics.js" async>` downloads and executes as soon as ready, without blocking
 - **[Minify CSS](/lighthouse/how-to-fix-unminified-css/)** — Smaller files download faster, reducing the blocking window
-- **Preload critical fonts** — `<link rel="preload" as="font" crossorigin>` starts the font download early, reducing the time fonts block text rendering
+- **Preload critical fonts** — [`<link rel="preload">`](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel/preload) with `as="font" crossorigin` starts the font download early, reducing the time fonts block text rendering
 - **Use `<link rel="modulepreload">`** — For ES modules, `modulepreload` fetches and compiles the module ahead of time
 
 ## People Also Ask

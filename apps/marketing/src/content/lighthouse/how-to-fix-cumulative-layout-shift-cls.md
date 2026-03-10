@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags Cumulative Layout Shift, it means elements on the page moved unexpectedly after rendering. CLS carries a **weight of 25** in the Performance score — tied with [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/) as the second-heaviest metric. Every visible element that shifts position without user interaction contributes to the score.
+When Lighthouse flags [Cumulative Layout Shift](https://web.dev/articles/cls), it means elements on the page moved unexpectedly after rendering. CLS carries a **weight of 25** in the Performance score — tied with [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/) as the second-heaviest metric. Every visible element that shifts position without user interaction contributes to the score.
 
 Lighthouse calculates CLS by multiplying the fraction of the viewport affected by the shift (impact fraction) by the distance the element moved (distance fraction). These individual shift scores accumulate across the page load.
 
@@ -52,11 +52,11 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 ## Key Fixes for CLS
 
-- **Set explicit dimensions on images and videos** — Always include `width` and `height` attributes, or use CSS `aspect-ratio`
+- **Set explicit dimensions on images and videos** — Always include `width` and `height` attributes, or use CSS [`aspect-ratio`](https://developer.mozilla.org/en-US/docs/Web/CSS/aspect-ratio)
 - **Reserve space for dynamic content** — Use `min-height` on containers that load content asynchronously
 - **Use `font-display: swap` or `optional`** — Prevents invisible text and reduces reflow when web fonts load. See the [font loading strategy](https://frontman.sh/glossary/font-loading-strategy/) glossary entry
 - **Avoid inserting content above existing content** — Place banners, ads, and notices in reserved slots
-- **Use `transform` for animations** — Animate `transform` and `opacity` instead of layout-triggering properties like `width`, `height`, or `margin`
+- **Use [`transform`](https://developer.mozilla.org/en-US/docs/Web/CSS/transform) for animations** — Animate `transform` and `opacity` instead of layout-triggering properties like `width`, `height`, or `margin`
 - **Use `content-visibility: auto`** — For off-screen sections, this tells the browser to skip layout until the element is near the viewport
 
 ## People Also Ask

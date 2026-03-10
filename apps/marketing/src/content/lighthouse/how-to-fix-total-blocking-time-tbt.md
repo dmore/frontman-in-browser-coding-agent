@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags Total Blocking Time, it means JavaScript tasks on the main thread are running too long during page load. TBT carries a **weight of 30** — the heaviest single metric in the Lighthouse Performance score. It measures the total milliseconds where the main thread was blocked by long tasks between [First Contentful Paint](/lighthouse/how-to-fix-first-contentful-paint-fcp/) and Time to Interactive.
+When Lighthouse flags [Total Blocking Time](https://web.dev/articles/tbt), it means JavaScript tasks on the main thread are running too long during page load. TBT carries a **weight of 30** — the heaviest single metric in the Lighthouse Performance score. It measures the total milliseconds where the main thread was blocked by long tasks between [First Contentful Paint](/lighthouse/how-to-fix-first-contentful-paint-fcp/) and Time to Interactive.
 
 A "long task" is any JavaScript execution that takes more than 50 ms. TBT sums the *blocking portion* of each long task — the time beyond 50 ms. A task that runs for 120 ms contributes 70 ms to TBT.
 
@@ -52,9 +52,9 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 ## Key Fixes for TBT
 
 - **Defer non-critical JavaScript** — Add `defer` or `async` to `<script>` tags that are not needed for initial render
-- **Code split by route** — Use dynamic `import()` to load page-specific code only when needed. Frameworks like Next.js and Vite do this by default for routes, but component-level splitting often requires manual setup
+- **Code split by route** — Use dynamic [`import()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import) to load page-specific code only when needed. Frameworks like Next.js and Vite do this by default for routes, but component-level splitting often requires manual setup
 - **Remove [unused JavaScript](/lighthouse/how-to-fix-unused-javascript/)** — Audit your bundle with source maps and remove dead code
-- **Move heavy work to Web Workers** — Data processing, sorting, and computation that does not need DOM access can run off the main thread
+- **Move heavy work to [Web Workers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API)** — Data processing, sorting, and computation that does not need DOM access can run off the main thread
 - **Break up long tasks** — Use `requestIdleCallback`, `setTimeout(fn, 0)`, or the `scheduler.yield()` API to yield to the main thread between chunks of work
 - **Reduce third-party impact** — Load analytics and chat widgets after the page is interactive, or use [Partytown](https://frontman.sh/glossary/partytown/) to run them in a Web Worker
 - **[Minify JavaScript](/lighthouse/how-to-fix-unminified-javascript/)** — Smaller files parse faster

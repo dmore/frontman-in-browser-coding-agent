@@ -54,10 +54,10 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 ## Key Fixes
 
-- **Code split by route** — Use dynamic `import()` so each page only loads its own code. Next.js, Remix, and Vite handle route-level splitting automatically, but shared component bundles may still need manual splitting
+- **Code split by route** — Use dynamic [`import()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import) so each page only loads its own code. Next.js, Remix, and Vite handle route-level splitting automatically, but shared component bundles may still need manual splitting
 - **Use specific imports** — `import { debounce } from 'lodash-es'` instead of `import _ from 'lodash'`. Better yet, use `lodash-es` which is tree-shakeable
 - **Remove unused polyfills** — Update your `browserslist` config to target only browsers you actually support. Use `@babel/preset-env` with `useBuiltIns: 'usage'` to include only needed polyfills
-- **Enable tree shaking** — Use ES modules (`import`/`export`) so your bundler can remove unused exports. Mark packages as side-effect-free in `package.json` with `"sideEffects": false`
+- **Enable tree shaking** — Use [ES modules](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules) (`import`/`export`) so your bundler can remove unused exports. Mark packages as side-effect-free in `package.json` with `"sideEffects": false`
 - **Lazy-load third-party scripts** — Load analytics, chat widgets, and ad scripts after the page is interactive
 - **Audit your dependencies** — Use [bundlephobia.com](https://bundlephobia.com) to check package sizes before adding them. Use `source-map-explorer` to visualize what is in your bundle
 

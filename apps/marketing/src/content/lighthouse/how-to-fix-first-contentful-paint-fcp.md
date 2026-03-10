@@ -18,7 +18,7 @@ faq:
 
 ## What Lighthouse Is Telling You
 
-When Lighthouse flags First Contentful Paint, it means the browser took too long to render any text, image, SVG, or non-white canvas element. FCP carries a **weight of 10** in the Performance score. While it is lighter than [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/) and [TBT](/lighthouse/how-to-fix-total-blocking-time-tbt/), a slow FCP usually indicates problems that cascade into other metrics.
+When Lighthouse flags [First Contentful Paint](https://web.dev/articles/fcp), it means the browser took too long to render any text, image, SVG, or non-white canvas element. FCP carries a **weight of 10** in the Performance score. While it is lighter than [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/) and [TBT](/lighthouse/how-to-fix-total-blocking-time-tbt/), a slow FCP usually indicates problems that cascade into other metrics.
 
 FCP is the earliest signal that the page is loading. Users perceive a blank screen as broken — even one second of nothing feels slow.
 
@@ -55,11 +55,11 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 - **Inline critical CSS** — Extract styles needed for above-the-fold content and inline them in `<head>`. Defer the rest
 - **Defer non-critical JavaScript** — Move scripts to the end of `<body>` or add `defer`/`async` attributes
-- **Use `font-display: swap`** — Renders text immediately with a fallback font while the web font loads
+- **Use [`font-display: swap`](https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display)** — Renders text immediately with a fallback font while the web font loads
 - **Reduce server response time** — Use a CDN, enable server-side caching, and optimize database queries. Target TTFB under 200 ms
 - **Eliminate redirect chains** — Each redirect adds 100–300 ms. Point links directly to the final URL
 - **[Enable text compression](/lighthouse/how-to-fix-unminified-javascript/)** — Gzip or Brotli compression reduces transfer size, making HTML, CSS, and JS arrive faster
-- **Preconnect to required origins** — `<link rel="preconnect">` for third-party domains eliminates DNS and TLS handshake latency
+- **Preconnect to required origins** — [`<link rel="preconnect">`](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/rel/preconnect) for third-party domains eliminates DNS and TLS handshake latency
 
 ## People Also Ask
 

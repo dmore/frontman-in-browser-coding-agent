@@ -24,7 +24,7 @@ If this page should be publicly searchable, the indexing block needs to be remov
 
 ## Why Pages Get Blocked Accidentally
 
-- **Development `noindex` left in production** — Adding `<meta name="robots" content="noindex">` during development and forgetting to remove it before deployment
+- **Development `noindex` left in production** — Adding [`<meta name="robots" content="noindex">`](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/meta/name) during development and forgetting to remove it before deployment
 - **robots.txt blocking** — A `Disallow: /` rule in `robots.txt` that was meant for staging but got deployed to production
 - **HTTP header middleware** — Server or CDN middleware that adds `X-Robots-Tag: noindex` to responses globally instead of targeting specific paths
 - **Framework defaults** — Some frameworks or boilerplate templates include `noindex` in the base layout as a safety measure
@@ -54,7 +54,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 - **Remove X-Robots-Tag headers** — Check server config (nginx, Apache, Vercel, Netlify) and CDN settings for headers that add `noindex`
 - **Use environment-specific config** — Set `noindex` only in staging/development environments. Use environment variables: `if (process.env.NODE_ENV !== 'production') { noindex = true }`
 - **Audit your robots.txt** — Keep `robots.txt` in version control. Review it during deployment. Use [Google's robots.txt Tester](https://search.google.com/search-console/robots-testing-tool) to verify
-- **Use Google Search Console** — After fixing, use the URL Inspection tool to request reindexing and verify the page is indexable
+- **Use [Google Search Console](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag)** — After fixing, use the URL Inspection tool to request reindexing and verify the page is indexable
 
 ## People Also Ask
 

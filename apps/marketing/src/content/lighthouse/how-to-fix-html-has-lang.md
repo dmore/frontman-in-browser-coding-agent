@@ -25,7 +25,7 @@ When Lighthouse flags "`<html>` element does not have a `[lang]` attribute," the
 - **Screen reader pronunciation** — Screen readers switch speech synthesis engines based on the `lang` attribute. Without it, a French page is read with English pronunciation rules, making it incomprehensible
 - **Translation tools** — Browser auto-translate features and services like Google Translate use the `lang` attribute to determine the source language
 - **Search engines** — While not a direct ranking signal, the `lang` attribute helps search engines categorize content for language-specific search results
-- **CSS language selectors** — CSS selectors like `:lang(en)` and `:lang(fr)` let you apply language-specific styling (e.g., different quotation marks)
+- **CSS language selectors** — CSS selectors like [`:lang(en)`](https://developer.mozilla.org/en-US/docs/Web/CSS/:lang) and `:lang(fr)` let you apply language-specific styling (e.g., different quotation marks)
 
 ## The Old Way to Fix It
 
@@ -44,7 +44,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 ## Key Fixes
 
-- **Add `lang` to the `<html>` element** — `<html lang="en">` for English content. Use the correct [BCP 47 language tag](https://www.ietf.org/rfc/bcp/bcp47.txt) for your language
+- **Add [`lang`](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/lang) to the `<html>` element** — `<html lang="en">` for English content. Use the correct [BCP 47 language tag](https://www.ietf.org/rfc/bcp/bcp47.txt) for your language
 - **Set it in your root layout** — In Next.js (`layout.tsx`), Astro (`Layout.astro`), or any framework, the `<html>` tag in the root layout is where `lang` belongs
 - **Use region subtags when relevant** — `en-US` vs. `en-GB` matters for screen reader pronunciation of dates, currency, and spelling differences
 - **Handle multilingual sites dynamically** — For i18n sites, set `lang` based on the current locale: `<html lang={locale}>`
