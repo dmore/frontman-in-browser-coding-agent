@@ -67,8 +67,8 @@ describe("Task - Single Streaming Message Invariant", () => {
   test("TextDeltaReceived appends to streaming message", t => {
     let task = _startAgent()
     let (task1, _) = TaskReducer.next(task, StreamingStarted)
-    let (task2, _) = TaskReducer.next(task1, TextDeltaReceived({text: "Hello"}))
-    let (task3, _) = TaskReducer.next(task2, TextDeltaReceived({text: " world"}))
+    let (task2, _) = TaskReducer.next(task1, TextDeltaReceived({text: "Hello", timestamp: "2024-01-15T10:00:00Z"}))
+    let (task3, _) = TaskReducer.next(task2, TextDeltaReceived({text: " world", timestamp: "2024-01-15T10:00:00Z"}))
 
     switch TaskReducer.Selectors.streamingMessage(task3) {
     | Some(Message.Streaming({textBuffer})) =>
@@ -80,7 +80,7 @@ describe("Task - Single Streaming Message Invariant", () => {
   test("TurnCompleted converts streaming to completed", t => {
     let task = _startAgent()
     let (task1, _) = TaskReducer.next(task, StreamingStarted)
-    let (task2, _) = TaskReducer.next(task1, TextDeltaReceived({text: "Hello"}))
+    let (task2, _) = TaskReducer.next(task1, TextDeltaReceived({text: "Hello", timestamp: "2024-01-15T10:00:00Z"}))
     let (task3, _) = TaskReducer.next(task2, TurnCompleted)
 
     let messages = TestHelpers.getMessages(task3)
@@ -202,6 +202,66 @@ describe("Task - Load State Machine", () => {
     let (failedTask, _) = TaskReducer.next(task, LoadError({error: "Network error"}))
 
     t->expect(Task.isUnloaded(failedTask))->Expect.toBe(true)
+  })
+})
+
+// ============================================================================
+// Session Rehydration Tests
+//
+// The bug: during history replay, agent messages go through TextDeltaBuffer
+// which schedules rAF. LoadComplete fires before rAF, transitioning to
+// Loaded({isAgentRunning: false}), and the stale-streaming guard silently
+// drops late TextDeltaReceived actions. Fix: flush() before LoadComplete.
+// ============================================================================
+
+describe("Task - Session Rehydration (Loading history → LoadComplete)", () => {
+  test("agent message (TextDeltaReceived) survives LoadComplete", t => {
+    let task = TestHelpers.makeLoadingTask()
+
+    let (task, _) = TaskReducer.next(task, TextDeltaReceived({text: "Hi there!", timestamp: "2024-01-15T10:00:00Z"}))
+    let (loaded, _) = TaskReducer.next(task, LoadComplete)
+
+    t->expect(Task.isLoaded(loaded))->Expect.toBe(true)
+    let messages = TestHelpers.getMessages(loaded)
+    t->expect(messages->Array.length)->Expect.toBe(1)
+
+    switch messages->Array.get(0) {
+    | Some(Message.Assistant(Completed({content, _}))) =>
+      switch content->Array.get(0) {
+      | Some(Message.AssistantContentPart.Text({text})) =>
+        t->expect(text)->Expect.toBe("Hi there!")
+      | _ => t->expect("Assistant text content")->Expect.toBe("missing")
+      }
+    | Some(Message.Assistant(Streaming(_))) =>
+      t->expect("Streaming after LoadComplete")->Expect.toBe("should be Completed")
+    | _ => t->expect("Assistant message")->Expect.toBe("not found")
+    }
+  })
+
+  test("in-flight streaming message is finalized to Completed by LoadComplete", t => {
+    let task = TestHelpers.makeLoadingTask()
+
+    let (task, _) = TaskReducer.next(task, StreamingStarted)
+    let (task, _) = TaskReducer.next(task, TextDeltaReceived({text: "partial ", timestamp: "2024-01-15T10:00:00Z"}))
+    let (task, _) = TaskReducer.next(task, TextDeltaReceived({text: "response", timestamp: "2024-01-15T10:00:00Z"}))
+
+    // Before LoadComplete: still Streaming
+    t->expect(TaskReducer.Selectors.streamingMessage(task)->Option.isSome)->Expect.toBe(true)
+
+    // After LoadComplete: finalized to Completed
+    let (loaded, _) = TaskReducer.next(task, LoadComplete)
+    t->expect(TaskReducer.Selectors.streamingMessage(loaded))->Expect.toBe(None)
+
+    let messages = TestHelpers.getMessages(loaded)
+    switch messages->Array.get(0) {
+    | Some(Message.Assistant(Completed({content, _}))) =>
+      switch content->Array.get(0) {
+      | Some(Message.AssistantContentPart.Text({text})) =>
+        t->expect(text)->Expect.toBe("partial response")
+      | _ => t->expect("Completed text")->Expect.toBe("missing")
+      }
+    | _ => t->expect("Completed assistant message")->Expect.toBe("not found")
+    }
   })
 })
 
@@ -329,7 +389,7 @@ describe("Task - Error Handling", () => {
       }),
     )
     let (task1, _) = TaskReducer.next(task0, StreamingStarted)
-    let (task2, _) = TaskReducer.next(task1, TextDeltaReceived({text: "Partial response"}))
+    let (task2, _) = TaskReducer.next(task1, TextDeltaReceived({text: "Partial response", timestamp: "2024-01-15T10:00:00Z"}))
 
     // Verify we have a streaming message
     switch TaskReducer.Selectors.streamingMessage(task2) {
@@ -415,7 +475,7 @@ describe("Task - CancelTurn", () => {
     )
     // Agent is now running
     let (task2, _) = TaskReducer.next(task1, StreamingStarted)
-    let (task3, _) = TaskReducer.next(task2, TextDeltaReceived({text: "Partial resp"}))
+    let (task3, _) = TaskReducer.next(task2, TextDeltaReceived({text: "Partial resp", timestamp: "2024-01-15T10:00:00Z"}))
     task3
   }
 
@@ -543,7 +603,7 @@ describe("Task - CancelTurn", () => {
 
     // Start new streaming
     let (task3, _) = TaskReducer.next(task2, StreamingStarted)
-    let (task4, _) = TaskReducer.next(task3, TextDeltaReceived({text: "New response"}))
+    let (task4, _) = TaskReducer.next(task3, TextDeltaReceived({text: "New response", timestamp: "2024-01-15T10:00:00Z"}))
 
     let messages = TestHelpers.getMessages(task4)
     // Messages: User1 + Completed(Partial resp) + User2 + Streaming(New response)
@@ -589,7 +649,7 @@ describe("Task - Stale Event Guard", () => {
 
   test("TextDeltaReceived is silently dropped when agent not running", t => {
     let task = _cancelledTask()
-    let (unchanged, effects) = TaskReducer.next(task, TextDeltaReceived({text: "stale text"}))
+    let (unchanged, effects) = TaskReducer.next(task, TextDeltaReceived({text: "stale text", timestamp: "2024-01-15T10:00:00Z"}))
 
     t->expect(effects)->Expect.toEqual([])
     t->expect(TestHelpers.getMessages(unchanged)->Array.length)->Expect.toBe(1)
@@ -653,7 +713,7 @@ describe("Task - Stale Event Guard", () => {
     // Loading state should still process streaming events normally
     let task = TestHelpers.makeLoadingTask()
     let (task1, _) = TaskReducer.next(task, StreamingStarted)
-    let (task2, _) = TaskReducer.next(task1, TextDeltaReceived({text: "loading text"}))
+    let (task2, _) = TaskReducer.next(task1, TextDeltaReceived({text: "loading text", timestamp: "2024-01-15T10:00:00Z"}))
 
     switch TaskReducer.Selectors.streamingMessage(task2) {
     | Some(Message.Streaming({textBuffer})) =>

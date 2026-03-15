@@ -218,11 +218,15 @@
                       ]
                     }
                   ]
+                },
+                "timestamp": {
+                  "type": "string"
                 }
               },
               "additionalProperties": true,
               "required": [
-                "sessionUpdate"
+                "sessionUpdate",
+                "timestamp"
               ]
             },
             {
