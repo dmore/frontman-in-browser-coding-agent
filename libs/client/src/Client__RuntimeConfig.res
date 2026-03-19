@@ -1,13 +1,14 @@
 // Runtime config injected by the framework middleware (e.g., Next.js)
 // Reads from window.__frontmanRuntime
 
-type frameworkId = Nextjs | Vite | Astro
+type frameworkId = Nextjs | Vite | Astro | Wordpress
 
 let frameworkIdFromString = (s: string): frameworkId =>
   switch s {
   | "nextjs" => Nextjs
   | "vite" => Vite
   | "astro" => Astro
+  | "wordpress" => Wordpress
   | _ => JsError.throwWithMessage(`Unknown framework ID: "${s}"`)
   }
 
@@ -16,6 +17,7 @@ let frameworkIdToString = (id: frameworkId): string =>
   | Nextjs => "nextjs"
   | Vite => "vite"
   | Astro => "astro"
+  | Wordpress => "wordpress"
   }
 
 // Map a framework ID to a human-readable display name.
@@ -26,6 +28,7 @@ let frameworkDisplayName = (id: frameworkId): string =>
   | Nextjs => "Next.js"
   | Vite => "Vite"
   | Astro => "Astro"
+  | Wordpress => "WordPress"
   }
 
 @schema
@@ -86,6 +89,7 @@ let frameworkToNpmPackage = (id: frameworkId): string =>
   | Nextjs => "@frontman-ai/nextjs"
   | Vite => "@frontman-ai/vite"
   | Astro => "@frontman-ai/astro"
+  | Wordpress => "@frontman-ai/standalone"
   }
 
 // Convert runtime config to _meta JSON for ACP requests
