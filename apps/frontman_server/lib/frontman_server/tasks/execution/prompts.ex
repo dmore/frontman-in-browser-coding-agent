@@ -146,7 +146,10 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
 
   defp append_framework_guidance(prompt, %Framework{id: :vite}), do: prompt
   defp append_framework_guidance(prompt, %Framework{id: :astro}), do: prompt
-  defp append_framework_guidance(prompt, %Framework{id: :wordpress}), do: prompt
+
+  defp append_framework_guidance(prompt, %Framework{id: :wordpress}),
+    do: prompt <> "\n" <> wordpress_guidance()
+
   defp append_framework_guidance(prompt, nil), do: prompt
 
   defp append_project_structure(prompt, nil), do: prompt
@@ -269,6 +272,20 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
     - **Never modify comments** when the user is referring to rendered/visible text
     - **Never guess** which of several interpretations the user meant - ask instead
     - **Never explore or search** the codebase - go directly to the annotated file(s)
+    """
+  end
+
+  defp wordpress_guidance do
+    """
+    ## WordPress
+
+    Use WordPress tools for content (posts, blocks, menus, widgets, templates). Use file tools for theme/plugin code.
+
+    **MUST refresh**: Call `navigate` after ANY write — no hot reload.
+
+    **MUST ask before theme file edits**:
+    1. Ask: "Should I edit the current theme or create a child theme?"
+    2. If child theme → suggest a name (e.g., `flavor-child`) and confirm before proceeding.
     """
   end
 
