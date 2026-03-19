@@ -1,6 +1,5 @@
 ---
-"frontman_server": minor
-"marketing": patch
+"@frontman-ai/client": minor
 ---
 
 Add support for GPT-5.4 and GPT-5.4 Pro models

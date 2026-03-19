@@ -1,7 +1,5 @@
 ---
-"frontman_server": minor
-"swarm_ai": minor
-"@frontman-ai/client": patch
+"@frontman-ai/client": minor
 "@frontman-ai/frontman-client": patch
 "@frontman-ai/frontman-protocol": patch
 ---

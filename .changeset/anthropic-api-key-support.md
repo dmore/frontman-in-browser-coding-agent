@@ -1,5 +1,5 @@
 ---
-"frontman_server": minor
+"@frontman-ai/client": minor
 ---
 
 Add Anthropic API key support as alternative to OAuth

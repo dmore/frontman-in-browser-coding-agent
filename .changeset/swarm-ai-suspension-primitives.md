@@ -1,5 +1,5 @@
 ---
-"swarm_ai": minor
+"@frontman-ai/client": minor
 ---
 
 Add tool suspension primitives to SwarmAi
