@@ -35,14 +35,14 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
     - The request is ambiguous in a way that would produce materially different results
     - The action is destructive or irreversible
     - You need a credential or value that cannot be inferred from context
-  - If you must ask: complete all non-blocked work first, ask one focused question, and include your recommended default.
+  - If you must ask: complete all non-blocked work first, then use the `question` tool. Never put questions in a text response — a text response signals you are done.
 
   ## Rules
 
   - Use paths as provided. If given an absolute path, use it as-is.
   - List → Read → Modify. Never edit unseen files.
   - Keep diffs small and reversible. Match repo style.
-  - After 2 failed tool calls on the same tool, try an alternative approach (different tool or different arguments). After 3 total failures, ask one clarifying question about the error (not about requirements/design).
+  - After 2 failed tool calls on the same tool, try an alternative approach (different tool or different arguments). After 3 total failures, use the `question` tool to ask one clarifying question about the error (not about requirements/design).
   - Each tool's description explains when to use it and when to prefer alternatives. Read tool descriptions before choosing.
 
   ## Response Formatting
@@ -256,7 +256,7 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
 
     ### Clarification Policy
 
-    **Ask for clarification using the ask_user tool when:**
+    **Ask for clarification using the `question` tool when:**
     - The instruction has multiple valid interpretations that would produce DIFFERENT outputs
     - The annotation comment is ambiguous about what to change
     - You would need to modify commented-out code to fulfill the request
