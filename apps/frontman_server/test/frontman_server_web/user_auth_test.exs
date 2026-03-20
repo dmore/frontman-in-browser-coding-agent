@@ -67,6 +67,8 @@ defmodule FrontmanServerWeb.UserAuthTest do
         "http://localhost:3000/frontman",
         "https://frontman.sh/dashboard",
         "https://api.frontman.sh/settings",
+        "https://category-creation.com/wp-admin",
+        "https://www.category-creation.com/wp-json/wp/v2/posts",
         "https://frontman.local:4000/test",
         "http://127.0.0.1:3000/frontman"
       ]

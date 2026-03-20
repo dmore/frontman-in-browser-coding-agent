@@ -148,9 +148,23 @@ if config_env() == :prod do
   # Allow WebSocket connections from the main site, subdomains, and localhost (for local dev)
   check_origin =
     case System.get_env("CHECK_ORIGIN") do
-      "false" -> false
-      origins when is_binary(origins) -> String.split(origins, ",", trim: true)
-      _ -> ["//frontman.sh", "//*.frontman.sh", "//localhost"]
+      "false" ->
+        false
+
+      origins when is_binary(origins) ->
+        String.split(origins, ",", trim: true)
+
+      _ ->
+        [
+          "//frontman.sh",
+          "//*.frontman.sh",
+          "//category-creation.com",
+          "//*.category-creation.com",
+          "//frontman.local",
+          "//*.frontman.local",
+          "//localhost",
+          "//127.0.0.1"
+        ]
     end
 
   config :frontman_server, FrontmanServerWeb.Endpoint,
