@@ -49,6 +49,10 @@ const blogPostJsonLd = {
 			"url": "https://frontman.sh/logo.svg"
 		}
 	},
+	"speakable": {
+		"@type": "SpeakableSpecification",
+		"cssSelector": [".post-body h1", ".post-body h2", ".post-body p:first-of-type"]
+	},
 	"mainEntityOfPage": {
 		"@type": "WebPage",
 		"@id": Astro.url.href
