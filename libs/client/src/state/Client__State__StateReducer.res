@@ -396,6 +396,7 @@ module Selectors = {
       | Assistant(Streaming(_)) => false
       | ToolCall({state: OutputAvailable | OutputError, _}) => true
       | ToolCall(_) => false
+      | Error(_) => true
       }
     })
 
@@ -1166,13 +1167,6 @@ let handleEffect = (effect, state: state, dispatch) => {
           // (task was in Loading state). If task was already Loaded,
           // we just re-activated the channel - no state transition needed.
           if needsHistory {
-            // Flush buffered text deltas before completing the load.
-            // Agent messages go through the rAF-based TextDeltaBuffer,
-            // so they may still be pending when the session/load RPC
-            // response arrives. Without this flush, LoadComplete
-            // transitions the task to Loaded({isAgentRunning: false}),
-            // and the guard in TaskReducer drops any late TextDeltaReceived
-            // actions — causing agent messages to silently vanish.
             Client__TextDeltaBuffer.flush()
             dispatch(TaskAction({target: ForTask(taskIdToLoad), action: LoadComplete}))
           }
