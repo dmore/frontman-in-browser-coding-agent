@@ -1,0 +1,50 @@
+name: IndexNow Submission
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/marketing/**"
+      - "libs/frontman-astro/**"
+      - "!apps/marketing/**/*.txt"
+  workflow_dispatch:
+
+jobs:
+  build-and-submit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/marketing
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: "24.4.1"
+          cache: "yarn"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+        working-directory: .
+
+      - name: Build ReScript packages
+        run: yarn rescript
+        working-directory: .
+
+      - name: Bundle astro integration
+        run: yarn build:bundle
+        working-directory: libs/frontman-astro
+
+      - name: Build and submit to IndexNow
+        run: |
+          yarn build
+          node scripts/indexnow.mjs
+        env:
+          # Dotenv will automatically load .env file if present
+          # For CI, you might want to set these as repository secrets instead
+          # NODE_ENV: production
