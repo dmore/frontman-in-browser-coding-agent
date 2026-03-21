@@ -59,6 +59,11 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy apps/marketing/dist --project-name=frontman-marketing --branch=main
 
+      - name: Submit to IndexNow
+        if: success()
+        continue-on-error: true
+        run: node apps/marketing/scripts/indexnow.mjs
+
       - name: Notify Discord
         if: always()
         continue-on-error: true

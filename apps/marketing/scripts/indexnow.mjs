@@ -7,6 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const distDir = join(__dirname, "..", "dist");
 const siteUrl = config.site; // e.g., "https://frontman.sh"
+// Bing-issued verification token — also served as a static file in public/
 const verificationFileName = "b93ec302-3eda-4805-a374-3d5e0d5d4fa3.txt";
 const key = verificationFileName.replace(".txt", "");
 
@@ -60,59 +61,29 @@ async function submitToIndexNow(urls) {
     return;
   }
 
-  const data = JSON.stringify({
+  const body = JSON.stringify({
     host: new URL(siteUrl).hostname,
     key,
     urlList: urls,
   });
 
-  const options = {
-    hostname: "www.bing.com",
-    path: "/indexnow",
+  const response = await fetch("https://www.bing.com/indexnow", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Content-Length": Buffer.byteLength(data),
-    },
-  };
-
-  return new Promise((resolve, reject) => {
-    // Import https module dynamically to avoid ES module issues
-    import("https")
-      .then(({ default: https }) => {
-        const req = https.request(options, (res) => {
-          let chunks = [];
-          res.on("data", (chunk) => {
-            chunks.push(chunk);
-          });
-          res.on("end", () => {
-            const response = Buffer.concat(chunks).toString();
-            console.log(`Bing IndexNow response status: ${res.statusCode}`);
-            console.log(`Bing IndexNow response body: ${response}`);
-            if (res.statusCode === 200 || res.statusCode === 202) {
-              console.log(
-                `Successfully submitted ${urls.length} URLs to Bing IndexNow.`,
-              );
-              resolve();
-            } else {
-              reject(
-                new Error(`Bing IndexNow returned status ${res.statusCode}`),
-              );
-            }
-          });
-        });
-
-        req.on("error", (error) => {
-          reject(error);
-        });
-
-        req.write(data);
-        req.end();
-      })
-      .catch((error) => {
-        reject(error);
-      });
+    headers: { "Content-Type": "application/json" },
+    body,
   });
+
+  const responseText = await response.text();
+  console.log(`Bing IndexNow response status: ${response.status}`);
+  console.log(`Bing IndexNow response body: ${responseText}`);
+
+  if (response.status !== 200 && response.status !== 202) {
+    throw new Error(`Bing IndexNow returned status ${response.status}`);
+  }
+
+  console.log(
+    `Successfully submitted ${urls.length} URLs to Bing IndexNow.`,
+  );
 }
 
 // Main function
@@ -174,4 +145,4 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+main();
