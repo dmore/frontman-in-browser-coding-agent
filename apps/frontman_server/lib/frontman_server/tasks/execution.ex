@@ -147,7 +147,8 @@ defmodule FrontmanServer.Tasks.Execution do
   def handle_swarm_event(_scope, _task_id, {:cancelled, _}),
     do: :agent_cancelled
 
-  def handle_swarm_event(_scope, _task_id, _event), do: :ok
+  # Tool calls are persisted by ToolExecutor; no channel action needed.
+  def handle_swarm_event(_scope, _task_id, {:tool_call, _}), do: :ok
 
   # --- Private ---
 
