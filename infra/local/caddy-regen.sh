@@ -5,7 +5,7 @@
 # generates reverse proxy routes for each one, writes the Caddyfile that
 # Caddy's bind mount points to, and reloads Caddy.
 #
-# Networking: Caddy runs with --network=host and routes to localhost:<port>.
+# Networking: Caddy runs with --network=host and routes to 127.0.0.1:<port>.
 # Each pod publishes deterministic ports derived from its hash.
 #
 # Usage: ./infra/local/caddy-regen.sh
