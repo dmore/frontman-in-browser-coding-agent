@@ -233,15 +233,18 @@ function toolKey(tool: string): keyof Feature {
 		color: rgba(255, 255, 255, 0.6);
 	}
 
-	/* Desktop table */
+	/* Desktop table — visible by default for crawlers that don't run JS */
 	.table-wrapper {
 		@apply hidden md:block;
+	}
+
+	.table-wrapper.animate {
 		opacity: 0;
 		transform: translateY(24px);
 		transition: opacity 0.6s ease, transform 0.6s ease;
 	}
 
-	.table-wrapper.visible {
+	.table-wrapper.animate.visible {
 		opacity: 1;
 		transform: translateY(0);
 	}
@@ -307,15 +310,18 @@ function toolKey(tool: string): keyof Feature {
 		color: #f59e0b;
 	}
 
-	/* Mobile cards */
+	/* Mobile cards — visible by default for crawlers that don't run JS */
 	.mobile-cards {
 		@apply flex flex-col gap-4 md:hidden;
+	}
+
+	.mobile-cards.animate {
 		opacity: 0;
 		transform: translateY(24px);
 		transition: opacity 0.6s ease, transform 0.6s ease;
 	}
 
-	.mobile-cards.visible {
+	.mobile-cards.animate.visible {
 		opacity: 1;
 		transform: translateY(0);
 	}
@@ -399,6 +405,9 @@ function toolKey(tool: string): keyof Feature {
 		const targets = [table, cards].filter(Boolean) as HTMLElement[]
 
 		if (targets.length === 0) return
+
+		// Add animate class via JS so content stays visible for non-JS crawlers
+		targets.forEach((el) => el.classList.add('animate'))
 
 		const observer = new IntersectionObserver(
 			(entries) => {
