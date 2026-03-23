@@ -11,6 +11,7 @@ defmodule FrontmanServer.Tasks.Todos do
   """
 
   alias FrontmanServer.Tasks.Interaction
+  alias FrontmanServer.Tools.TodoWrite
 
   defmodule Todo do
     @moduledoc false
@@ -101,8 +102,8 @@ defmodule FrontmanServer.Tasks.Todos do
     end
   end
 
-  defp todo_write_result?(%Interaction.ToolResult{tool_name: "todo_write", is_error: false}),
-    do: true
+  defp todo_write_result?(%Interaction.ToolResult{tool_name: name, is_error: false}),
+    do: name == TodoWrite.name()
 
   defp todo_write_result?(_), do: false
 
