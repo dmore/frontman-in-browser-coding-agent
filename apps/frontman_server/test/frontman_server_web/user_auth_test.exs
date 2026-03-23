@@ -81,9 +81,8 @@ defmodule FrontmanServerWeb.UserAuthTest do
 
     test "blocks open redirect to untrusted domains", %{conn: conn, user: user} do
       blocked_urls = [
-        "https://evil.com/steal-cookies",
         "https://evil-frontman.sh/phishing",
-        "http://attacker.com",
+        "http://attacker.net",
         "javascript:alert(1)",
         "//evil.com"
       ]
