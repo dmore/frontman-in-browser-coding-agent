@@ -39,8 +39,7 @@ let isBrowserAction = (toolName: string): bool => {
   String.includes(name, "select") ||
   String.includes(name, "press_key") ||
   String.includes(name, "resize") ||
-  // Navigate is an action
-  String.includes(name, "navigate")
+  name == "execute_js"
 }
 
 /**
@@ -94,11 +93,11 @@ let breaksGrouping = (toolName: string): bool => {
   String.includes(name, "create") ||
   String.includes(name, "delete") ||
   String.includes(name, "remove") ||
-  // Terminal/command execution
+  // Terminal/command execution — avoid bare "exec" which would also match
+  // browser tool "execute_js" (already caught by isBrowserAction below).
   String.includes(name, "terminal") ||
   String.includes(name, "command") ||
   String.includes(name, "run") ||
-  String.includes(name, "exec") ||
   String.includes(name, "shell") ||
   // Browser actions (clicking, typing, etc.)
   isBrowserAction(name) ||
