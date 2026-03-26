@@ -24,6 +24,7 @@ WPORG_EXPORT_PATH="$DIST_DIR/frontman-wordpress-org-v${VERSION}"
 
 rm -rf "$BUILD_DIR" "$ZIP_PATH" "$WPORG_TARBALL_PATH" "$WPORG_EXPORT_PATH"
 mkdir -p "$DIST_DIR"
+mkdir -p "$PLUGIN_DIR" "$WPORG_DIR/trunk" "$WPORG_DIR/tags/$VERSION"
 
 rsync -a --delete --exclude '.DS_Store' --exclude '.wordpress-org/' --exclude 'tests/' "$PLUGIN_SRC/" "$PLUGIN_DIR/"
 rsync -a --delete --exclude '.DS_Store' --exclude '.wordpress-org/' --exclude 'tests/' "$PLUGIN_SRC/" "$WPORG_DIR/trunk/"
