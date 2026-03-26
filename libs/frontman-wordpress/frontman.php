@@ -1,15 +1,15 @@
 <?php
 /**
- * Plugin Name:       Frontman
+ * Plugin Name:       Frontman - Agentic AI for WordPress
  * Plugin URI:        https://frontman.sh
- * Description:       AI-powered frontend editing for WordPress. Lets an AI agent see your site and edit posts, blocks, menus, templates, and options through a conversational UI.
+ * Description:       Agentic AI for WordPress: AI-powered frontend editing plugin. Your AI agent observes your live site and makes changes to posts, blocks, menus, templates, and site options - all through a conversational interface, no dashboard required.
  * Version:           0.3.3
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Frontman AI
  * Author URI:        https://frontman.sh
- * License:           Apache-2.0
- * License URI:       https://www.apache.org/licenses/LICENSE-2.0
+ * License:           GPL-2.0-or-later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       frontman
  */
 
