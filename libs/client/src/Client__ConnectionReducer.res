@@ -52,6 +52,7 @@ type state = {
   acp: acpState,
   relay: relayState,
   session: sessionState,
+  initialAuthBehavior: Client__FtueState.authBehavior,
   isSendingPrompt: bool,
   // Relay instance exists before connection completes - needed for MCPServer
   relayInstance: option<Relay.t>,
@@ -112,7 +113,11 @@ type action =
 type effect =
   | LogError(string)
   | LogInfo(string)
-  | ConnectACP({config: ACP.config, signal: WebAPI.EventAPI.abortSignal})
+  | ConnectACP({
+      config: ACP.config,
+      signal: WebAPI.EventAPI.abortSignal,
+      initialAuthBehavior: Client__FtueState.authBehavior,
+    })
   | ConnectRelay(Relay.t)
   | DisconnectRelay(Relay.t)
   | DisconnectACP(ACP.connection)
@@ -151,6 +156,7 @@ let initialState: state = {
   acp: ACPDisconnected,
   relay: RelayDisconnected,
   session: NoSession,
+  initialAuthBehavior: Client__FtueState.RedirectToLogin,
   isSendingPrompt: false,
   relayInstance: None,
   mcpServer: None,
@@ -248,13 +254,18 @@ let reduce = (state: state, action: action): (state, array<effect>) => {
         acp: ACPConnecting,
         relay: RelayConnecting,
         session: NoSession,
+        initialAuthBehavior: state.initialAuthBehavior,
         isSendingPrompt: false,
         relayInstance: Some(relay),
         mcpServer: Some(mcpServer),
         abortController: Some(abortController),
       },
       [
-        ConnectACP({config: acpConfig, signal: abortController.signal}),
+        ConnectACP({
+          config: acpConfig,
+          signal: abortController.signal,
+          initialAuthBehavior: state.initialAuthBehavior,
+        }),
         ConnectRelay(relay),
         LogInfo("Initializing connections..."),
       ],
@@ -441,7 +452,7 @@ let reduce = (state: state, action: action): (state, array<effect>) => {
     | ACPConnected(conn) => [DisconnectACP(conn)]
     | _ => []
     }
-    (initialState, Array.flat([abortEffects, relayEffects, acpEffects]))
+    ({...initialState, initialAuthBehavior: state.initialAuthBehavior}, Array.flat([abortEffects, relayEffects, acpEffects]))
 
   // === Invalid transitions ===
   | (_, Initialize(_)) => (
@@ -516,7 +527,7 @@ let handleEffect = (effect: effect, state: state, dispatch: action => unit) => {
   | AbortConnections(controller) =>
     Log.info("Aborting in-flight connections")
     WebAPI.AbortController.abort(controller)
-  | ConnectACP({config, signal}) =>
+  | ConnectACP({config, signal, initialAuthBehavior}) =>
     let connect = async () => {
       let result = await ACP.connect(config, ~signal)
       switch result {
@@ -533,12 +544,10 @@ let handleEffect = (effect: effect, state: state, dispatch: action => unit) => {
               WebAPI.Global.window->WebAPI.Window.location->WebAPI.Location.href
             let returnTo = encodeURIComponent(currentUrl)
             let fullUrl = `${loginUrl}?return_to=${returnTo}`
-            // For first-time users, surface the auth URL so the UI can show a welcome modal.
-            // Returning users get redirected immediately.
-            switch Client__FtueState.get() {
-            | Client__FtueState.New =>
+            switch initialAuthBehavior {
+            | Client__FtueState.ShowWelcomeModal =>
               dispatch(ACPConnectError(`auth_required:${fullUrl}`))
-            | Client__FtueState.WelcomeShown | Client__FtueState.Completed =>
+            | Client__FtueState.RedirectToLogin =>
               WebAPI.Global.window->WebAPI.Window.location->WebAPI.Location.assign(fullUrl)
             }
           | ACP.ConnectionFailed(msg) => dispatch(ACPConnectError(msg))

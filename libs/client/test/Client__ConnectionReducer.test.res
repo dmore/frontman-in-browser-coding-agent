@@ -4,6 +4,7 @@ module Reducer = Client__ConnectionReducer
 module ACP = FrontmanAiFrontmanClient.FrontmanClient__ACP
 module Relay = FrontmanAiFrontmanClient.FrontmanClient__Relay
 module MCPServer = FrontmanAiFrontmanClient.FrontmanClient__MCP__Server
+module FtueState = Client__FtueState
 
 // Helper to check if effect list contains a specific effect type
 let hasEffect = (effects, predicate) => effects->Array.some(predicate)
@@ -33,6 +34,13 @@ let hasConnectRelay = effects =>
     switch e {
     | Reducer.ConnectRelay(_) => true
     | _ => false
+    }
+  )
+let getConnectACPInitialAuthBehavior = effects =>
+  effects->Array.findMap(e =>
+    switch e {
+    | Reducer.ConnectACP({initialAuthBehavior}) => Some(initialAuthBehavior)
+    | _ => None
     }
   )
 
@@ -82,7 +90,7 @@ describe("Connection Reducer", () => {
         _meta: JSON.Encode.object(Dict.fromArray([("framework", JSON.Encode.string("test"))])),
       }
       let (nextState, effects) = Reducer.reduce(
-        Reducer.initialState,
+        {...Reducer.initialState, initialAuthBehavior: FtueState.ShowWelcomeModal},
         Initialize({config: mockConfig, relay: mockRelay, mcpServer: mockServer}),
       )
 
@@ -91,6 +99,7 @@ describe("Connection Reducer", () => {
       t->expect(Option.isSome(nextState.relayInstance))->Expect.toBe(true)
       t->expect(Option.isSome(nextState.mcpServer))->Expect.toBe(true)
       t->expect(hasConnectACP(effects))->Expect.toBe(true)
+      t->expect(getConnectACPInitialAuthBehavior(effects))->Expect.toBe(Some(FtueState.ShowWelcomeModal))
       t->expect(hasConnectRelay(effects))->Expect.toBe(true)
     })
 
@@ -403,6 +412,7 @@ describe("Connection Reducer", () => {
         acp: ACPConnected(mockConn),
         relay: RelayConnected,
         session: SessionActive(mockSession),
+        initialAuthBehavior: FtueState.ShowWelcomeModal,
         isSendingPrompt: false,
         relayInstance: Some(mockRelay),
         mcpServer: Some(mockServer),

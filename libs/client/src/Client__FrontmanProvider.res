@@ -190,7 +190,11 @@ module Provider = {
     })
 
     // Use StateReducer - effects are executed in useEffect, not during dispatch
-    let (state, dispatch) = StateReducer.useReducer(module(Reducer), Reducer.initialState)
+    let initialConnectionState = {
+      ...Reducer.initialState,
+      initialAuthBehavior: Client__FtueState.getAuthBehavior(),
+    }
+    let (state, dispatch) = StateReducer.useReducer(module(Reducer), initialConnectionState)
 
     // Single initialization effect
     React.useEffect0(() => {
