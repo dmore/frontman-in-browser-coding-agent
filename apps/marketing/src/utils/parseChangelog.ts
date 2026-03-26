@@ -1,6 +1,5 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { marked } from 'marked'
+import changelogRaw from '../../../../CHANGELOG.md?raw'
 
 export interface ChangelogEntry {
   title: string
@@ -61,11 +60,7 @@ function normalizeHeadingLevels(html: string): string {
 }
 
 export function parseChangelog(): ChangelogEntry[] {
-  const changelogPath = path.resolve(
-    import.meta.dirname,
-    '../../../../CHANGELOG.md'
-  )
-  const raw = fs.readFileSync(changelogPath, 'utf-8')
+  const raw = changelogRaw
 
   const entries: ChangelogEntry[] = []
   // Match ## [version] - date headings
