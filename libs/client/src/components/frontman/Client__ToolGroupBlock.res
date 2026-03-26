@@ -358,4 +358,3 @@ let make = (~group: Types.toolGroup, ~defaultExpanded: bool=false, ~isLastToolGr
     }
   </div>
 }
-

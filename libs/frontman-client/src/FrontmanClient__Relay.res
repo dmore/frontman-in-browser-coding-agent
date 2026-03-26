@@ -15,11 +15,13 @@ type relayState =
 
 type t = {
   baseUrl: string,
+  requestHeaders: Dict.t<string>,
   state: ref<relayState>,
 }
 
-let make = (~baseUrl: string): t => {
+let make = (~baseUrl: string, ~requestHeaders: Dict.t<string>=Dict.make()): t => {
   baseUrl,
+  requestHeaders,
   state: ref(Disconnected),
 }
 
@@ -35,7 +37,10 @@ let getState = (relay: t): relayState => relay.state.contents
 // Connect to dev server and fetch tools
 let connect = async (relay: t): result<unit, string> => {
   let url = `${relay.baseUrl}/frontman/tools`
-  let response = await WebAPI.Global.fetch(url)
+  let response = await WebAPI.Global.fetch(
+    url,
+    ~init={headers: WebAPI.HeadersInit.fromDict(relay.requestHeaders)},
+  )
 
   if !response.ok {
     let msg = `HTTP ${response.status->Int.toString}: ${response.statusText}`
@@ -107,17 +112,17 @@ let executeTool = async (
     let url = `${relay.baseUrl}/frontman/tools/call`
     let request: Types.toolCallRequest = {name, arguments}
     let body = request->S.reverseConvertToJsonOrThrow(Types.toolCallRequestSchema)
+    let headers = Dict.fromArray([
+      ("Content-Type", "application/json"),
+      ("Accept", "text/event-stream"),
+    ])
+    relay.requestHeaders->Dict.forEachWithKey((value, key) => headers->Dict.set(key, value))
 
     let response = await WebAPI.Global.fetch(
       url,
       ~init={
         method: "POST",
-        headers: WebAPI.HeadersInit.fromDict(
-          dict{
-            "Content-Type": "application/json",
-            "Accept": "text/event-stream",
-          },
-        ),
+        headers: WebAPI.HeadersInit.fromDict(headers),
         body: WebAPI.BodyInit.fromString(JSON.stringify(body)),
       },
     )
