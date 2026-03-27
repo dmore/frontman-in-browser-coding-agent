@@ -6,6 +6,8 @@ import frontman from "@frontman-ai/astro";
 import brokenLinksChecker from "astro-broken-links-checker";
 import path from "node:path";
 import fs from "node:fs";
+import hcStarlight from 'hc-starlight';
+import starlight from "@astrojs/starlight";
 
 const appRoot = path.resolve(import.meta.dirname);
 
@@ -46,60 +48,101 @@ export default defineConfig({
     inlineStylesheets: "always",
   },
   integrations: [
+    starlight({
+      title: "Frontman",
+      plugins: [hcStarlight()],
+      disable404Route: true,
+      logo: {
+        src: "./src/assets/logo.svg",
+      },
+      social: [
+        {
+          icon: "github",
+          label: "GitHub",
+          href: "https://github.com/frontman-ai/frontman",
+        },
+        {
+          icon: "discord",
+          label: "Discord",
+          href: "https://discord.gg/xk8uXJSvhC",
+        },
+        {
+          icon: "x.com",
+          label: "X",
+          href: "https://twitter.com/frontman_agent",
+        },
+      ],
+      sidebar: [
+        {
+          label: "Getting Started",
+          items: [
+            { label: "Introduction", slug: "docs" },
+            { label: "Installation", slug: "docs/installation" },
+            { label: "Quick Start", slug: "docs/quick-start" },
+          ],
+        },
+        { label: "Guides", autogenerate: { directory: "docs/guides" } },
+        { label: "Reference", autogenerate: { directory: "docs/reference" } },
+      ],
+      customCss: ["./src/styles/starlight.css"],
+      editLink: {
+        baseUrl:
+          "https://github.com/frontman-ai/frontman/edit/main/apps/marketing/",
+      },
+    }),
     frontman({
-      projectRoot: appRoot,
-      sourceRoot: monorepoRoot,
-      basePath: "frontman",
-      serverName: "marketing",
-    }),
-    icon(),
-    brokenLinksChecker(),
-    sitemap({
-      filter: (page) =>
-        // Exclude empty placeholder pages and internal-only pages
-        !page.includes("/pricing") &&
-        !page.includes("/design-system") &&
-        !page.includes("/contact"),
-      serialize: (item) => {
-        // Use the real pubDate for blog and lighthouse posts; fall back to
-        // build date for everything else.
-        const blogMatch = item.url.match(/\/blog\/([^/]+)\/?$/);
-        const glossaryMatch = item.url.match(/\/glossary\/([^/]+)\/?$/);
-        const lighthouseMatch = item.url.match(/\/lighthouse\/([^/]+)\/?$/);
-        if (blogMatch && blogDateMap.has(blogMatch[1])) {
-          item.lastmod = blogDateMap.get(blogMatch[1]);
-        } else if (glossaryMatch && glossaryDateMap.has(glossaryMatch[1])) {
-          item.lastmod = glossaryDateMap.get(glossaryMatch[1]);
-        } else if (lighthouseMatch && lighthouseDateMap.has(lighthouseMatch[1])) {
-          item.lastmod = lighthouseDateMap.get(lighthouseMatch[1]);
-        } else {
-          item.lastmod = new Date();
-        }
-        return item;
+    projectRoot: appRoot,
+    sourceRoot: monorepoRoot,
+    basePath: "frontman",
+    serverName: "marketing",
+  }), icon(), brokenLinksChecker(), sitemap({
+    filter: (page) =>
+      // Exclude empty placeholder pages and internal-only pages
+      !page.includes("/pricing") &&
+      !page.includes("/design-system") &&
+      !page.includes("/contact"),
+    serialize: (item) => {
+      // Use the real pubDate for blog and lighthouse posts; fall back to
+      // build date for everything else.
+      const blogMatch = item.url.match(/\/blog\/([^/]+)\/?$/);
+      const glossaryMatch = item.url.match(/\/glossary\/([^/]+)\/?$/);
+      const lighthouseMatch = item.url.match(/\/lighthouse\/([^/]+)\/?$/);
+      if (blogMatch && blogDateMap.has(blogMatch[1])) {
+        item.lastmod = blogDateMap.get(blogMatch[1]);
+      } else if (glossaryMatch && glossaryDateMap.has(glossaryMatch[1])) {
+        item.lastmod = glossaryDateMap.get(glossaryMatch[1]);
+      } else if (lighthouseMatch && lighthouseDateMap.has(lighthouseMatch[1])) {
+        item.lastmod = lighthouseDateMap.get(lighthouseMatch[1]);
+      } else {
+        item.lastmod = new Date();
+      }
+      return item;
+    },
+    // Split sitemap into content-grouped child sitemaps instead of a
+    // single flat sitemap-0.xml. URLs that don't match any chunk land
+    // in the default sitemap-pages-0.xml.
+    chunks: {
+      posts: (item) => {
+        if (/\/blog\/(?!tags\/)/.test(item.url)) return item;
       },
-      // Split sitemap into content-grouped child sitemaps instead of a
-      // single flat sitemap-0.xml. URLs that don't match any chunk land
-      // in the default sitemap-pages-0.xml.
-      chunks: {
-        posts: (item) => {
-          if (/\/blog\/(?!tags\/)/.test(item.url)) return item;
-        },
-        tags: (item) => {
-          if (/\/blog\/tags\//.test(item.url)) return item;
-        },
-        glossary: (item) => {
-          if (/\/glossary\//.test(item.url)) return item;
-        },
-        lighthouse: (item) => {
-          if (/\/lighthouse\//.test(item.url)) return item;
-        },
-        comparisons: (item) => {
-          if (/\/vs\//.test(item.url)) return item;
-        },
-        integrations: (item) => {
-          if (/\/integrations\//.test(item.url)) return item;
-        },
+      tags: (item) => {
+        if (/\/blog\/tags\//.test(item.url)) return item;
       },
-    }),
-  ],
+      glossary: (item) => {
+        if (/\/glossary\//.test(item.url)) return item;
+      },
+      lighthouse: (item) => {
+        if (/\/lighthouse\//.test(item.url)) return item;
+      },
+      comparisons: (item) => {
+        if (/\/vs\//.test(item.url)) return item;
+      },
+      integrations: (item) => {
+        if (/\/integrations\//.test(item.url)) return item;
+      },
+      docs: (item) => {
+        if (/\/docs\//.test(item.url)) return item;
+      },
+    },
+  })],
 });
