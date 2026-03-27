@@ -1,4 +1,4 @@
-=== Frontman - Agentic AI for WordPress ===
+=== Frontman - Agentic AI Editor ===
 Contributors: frontmanai
 Tags: ai, editing, content, gutenberg, blocks
 Requires at least: 6.0
