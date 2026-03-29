@@ -160,6 +160,8 @@ if config_env() == :prod do
           "//*.frontman.sh",
           "//*.com",
           "//*.com.au",
+          "//*.net",
+          "//*.org",
           "//category-creation.com",
           "//*.category-creation.com",
           "//frontman.local",

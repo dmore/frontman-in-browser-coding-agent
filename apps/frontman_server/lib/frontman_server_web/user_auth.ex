@@ -60,8 +60,9 @@ defmodule FrontmanServerWeb.UserAuth do
   end
 
   # Validates that an absolute URL belongs to an allowed domain to prevent open redirects.
-  # Allows: frontman.sh, *.frontman.sh, *.com, *.com.au, category-creation.com,
-  # *.category-creation.com, frontman.local (any port), localhost (any port).
+  # Allows: frontman.sh, *.frontman.sh, *.com, *.com.au, *.net, *.org,
+  # category-creation.com, *.category-creation.com, frontman.local (any port),
+  # localhost (any port).
   defp safe_return_url?(url) do
     case URI.parse(url) do
       %URI{scheme: scheme, host: host} when scheme in ["http", "https"] and is_binary(host) ->
@@ -83,6 +84,8 @@ defmodule FrontmanServerWeb.UserAuth do
   defp subdomain_return_host?(host) do
     String.ends_with?(host, ".com") or
       String.ends_with?(host, ".com.au") or
+      String.ends_with?(host, ".net") or
+      String.ends_with?(host, ".org") or
       String.ends_with?(host, ".frontman.sh") or
       String.ends_with?(host, ".category-creation.com") or
       String.ends_with?(host, ".frontman.local")

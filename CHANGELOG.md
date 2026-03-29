@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+## [Unreleased]
+
+### Changed
+- Allow `.net` and `.org` origins in the server's allowed origin and external return URL allowlists.
+
 ## [0.14.0] - 2026-03-27
 
 

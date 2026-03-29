@@ -68,6 +68,8 @@ defmodule FrontmanServerWeb.UserAuthTest do
         "https://frontman.sh/dashboard",
         "https://api.frontman.sh/settings",
         "https://shop.example.com.au/checkout",
+        "https://example.net/landing",
+        "https://www.example.org/blog",
         "https://category-creation.com/wp-admin",
         "https://www.category-creation.com/wp-json/wp/v2/posts",
         "https://frontman.local:4000/test",
@@ -83,7 +85,7 @@ defmodule FrontmanServerWeb.UserAuthTest do
     test "blocks open redirect to untrusted domains", %{conn: conn, user: user} do
       blocked_urls = [
         "https://evil-frontman.sh/phishing",
-        "http://attacker.net",
+        "http://attacker.xyz",
         "javascript:alert(1)",
         "//evil.com"
       ]
