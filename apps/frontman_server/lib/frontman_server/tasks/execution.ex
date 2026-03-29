@@ -200,7 +200,8 @@ defmodule FrontmanServer.Tasks.Execution do
             struct -> struct.summary
           end
 
-        {model_spec, llm_opts} = ResolvedKey.to_llm_args(resolved_key, max_tokens: 16_384)
+        max_tokens = Application.fetch_env!(:frontman_server, :llm_max_tokens)
+        {model_spec, llm_opts} = ResolvedKey.to_llm_args(resolved_key, max_tokens: max_tokens)
 
         RootAgent.new(
           tools: tools,
@@ -348,6 +349,12 @@ defmodule FrontmanServer.Tasks.Execution do
   defp humanize_error(:stream_timeout) do
     "The request to the AI provider timed out. " <>
       "This can happen during high traffic. Try again in a moment."
+  end
+
+  defp humanize_error(:output_truncated) do
+    "The AI response was too long and got cut off. " <>
+      "This usually happens when writing large files. " <>
+      "Try asking the AI to write the file in smaller sections."
   end
 
   defp humanize_error({:exit, reason}) do

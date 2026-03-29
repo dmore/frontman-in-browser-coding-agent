@@ -44,8 +44,12 @@ config :frontman_server,
   # Default usage limit for server-provided API keys
   user_key_usage_limit: 10,
   # Max time to wait for the next LLM stream chunk before declaring a stall.
-  # Must fire before StreamServer's 30s GenServer.call timeout.
-  stream_stall_timeout_ms: 25_000
+  # Opus 4.6 can think for minutes between content chunks; Anthropic sends
+  # ping keepalives but they don't reach this layer (filtered in ReqLLM).
+  stream_stall_timeout_ms: 5 * 60 * 1000,
+  # Max output tokens for LLM responses. Increase to support long file writes.
+  # Sonnet 4.5 supports up to 64K output tokens.
+  llm_max_tokens: 64_000
 
 # Configures the endpoint
 config :frontman_server, FrontmanServerWeb.Endpoint,
