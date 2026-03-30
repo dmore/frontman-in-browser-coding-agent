@@ -93,8 +93,8 @@ let countLines = (text: string): int => {
 // ContentEditable helpers (raw JS for DOM manipulation)
 // ============================================================================
 
-// Insert an HTML element at the current cursor position in a contentEditable
-let insertNodeAtCursor: Dom.element => unit = %raw(`
+// Insert a DOM node at the current cursor position in a contentEditable
+let insertNodeAtCursor: WebAPI.DOMAPI.node => unit = %raw(`
   function(node) {
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
@@ -110,7 +110,7 @@ let insertNodeAtCursor: Dom.element => unit = %raw(`
 `)
 
 // Create an inline chip DOM element for a file attachment
-let createFileChipElement: (string, string, string, bool) => Dom.element = %raw(`
+let createFileChipElement: (string, string, string, bool) => WebAPI.DOMAPI.node = %raw(`
   function(id, name, mediaType, isImage) {
     var chip = document.createElement('span');
     chip.setAttribute('contenteditable', 'false');
@@ -151,7 +151,7 @@ let createFileChipElement: (string, string, string, bool) => Dom.element = %raw(
 `)
 
 // Create an inline chip DOM element for pasted text
-let createPastedTextChipElement: (string, int) => Dom.element = %raw(`
+let createPastedTextChipElement: (string, int) => WebAPI.DOMAPI.node = %raw(`
   function(id, lineCount) {
     var chip = document.createElement('span');
     chip.setAttribute('contenteditable', 'false');
@@ -731,36 +731,38 @@ let make = (
     let acceptedFiles = files->Array.filter(file =>
       acceptedFileTypes->Array.some(t => t == file.type_)
     )
+    let text = getClipboardText(clipboardData)
+    let lineCount = countLines(text)
+    let charCount = String.length(text)
+    let isLongTextPaste = lineCount >= 3 || charCount > 150
 
-    if Array.length(acceptedFiles) > 0 {
+    switch (Array.length(acceptedFiles) > 0, text, isLongTextPaste) {
+    | (true, _, _) =>
       ReactEvent.Clipboard.preventDefault(e)
       addFiles(acceptedFiles)
-    } else {
-      // Check for multi-line text paste
-      let text = getClipboardText(clipboardData)
-      let lineCount = countLines(text)
-      let charCount = String.length(text)
+    | (false, "", _) => ()
+    | (false, _, true) =>
+      ReactEvent.Clipboard.preventDefault(e)
+      let id = generateId()
+      let newItem = PastedText({
+        id,
+        text,
+        lineCount,
+      })
+      setInputItems(prev => Array.concat(prev, [newItem]))
 
-      if text != "" && (lineCount >= 3 || charCount > 150) {
-        ReactEvent.Clipboard.preventDefault(e)
-        let id = generateId()
-        let newItem = PastedText({
-          id,
-          text,
-          lineCount,
-        })
-        setInputItems(prev => Array.concat(prev, [newItem]))
-
-        // Insert chip at cursor position
-        editableRef.current
-        ->Nullable.toOption
-        ->Option.forEach(_el => {
-          let chipEl = createPastedTextChipElement(id, lineCount)
-          insertNodeAtCursor(chipEl)
-          syncHasContent()
-        })
-      }
-      // else: let default paste behavior handle short text (browser inserts it)
+      // Insert chip at cursor position
+      editableRef.current
+      ->Nullable.toOption
+      ->Option.forEach(_el => {
+        let chipEl = createPastedTextChipElement(id, lineCount)
+        insertNodeAtCursor(chipEl)
+        syncHasContent()
+      })
+    | (false, _, false) =>
+      ReactEvent.Clipboard.preventDefault(e)
+      insertNodeAtCursor(WebAPI.Global.document->WebAPI.Document.createTextNode(text)->WebAPI.Text.asNode)
+      syncHasContent()
     }
   }
 
