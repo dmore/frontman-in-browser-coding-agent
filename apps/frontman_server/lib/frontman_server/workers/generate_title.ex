@@ -24,9 +24,8 @@ defmodule FrontmanServer.Workers.GenerateTitle do
   alias FrontmanServer.Providers.ResolvedKey
   alias FrontmanServer.Tasks
   alias FrontmanServer.Tasks.StreamCleanup
+  alias FrontmanServer.Vault
   alias ReqLLM.Message.ContentPart
-
-  @fallback_model "openrouter:google/gemini-2.0-flash-001"
 
   @system_prompt """
   Generate a concise 3-6 word title for this chat based on the user's message.
@@ -37,33 +36,42 @@ defmodule FrontmanServer.Workers.GenerateTitle do
   @type job_args :: %{
           user_id: String.t(),
           task_id: String.t(),
-          user_prompt_text: String.t()
+          user_prompt_text: String.t(),
+          model: String.t() | nil,
+          encrypted_env_api_key: String.t()
         }
 
   @doc """
   Builds an Oban job changeset for title generation.
   """
-  @spec new_job(String.t(), String.t(), String.t()) :: Oban.Job.changeset()
-  def new_job(user_id, task_id, user_prompt_text) do
+  @spec new_job(String.t(), String.t(), String.t(), String.t() | nil, map()) ::
+          Oban.Job.changeset()
+  def new_job(user_id, task_id, user_prompt_text, model, env_api_key) do
     new(%{
       user_id: user_id,
       task_id: task_id,
-      user_prompt_text: user_prompt_text
+      user_prompt_text: user_prompt_text,
+      model: model,
+      encrypted_env_api_key: encrypt_env_api_key(env_api_key)
     })
   end
 
   @impl Oban.Worker
   def perform(%Oban.Job{
-        args: %{
-          "user_id" => user_id,
-          "task_id" => task_id,
-          "user_prompt_text" => user_prompt_text
-        }
+        args:
+          %{
+            "user_id" => user_id,
+            "task_id" => task_id,
+            "user_prompt_text" => user_prompt_text
+          } = args
       }) do
     user = Accounts.get_user!(user_id)
     scope = Scope.for_user(user)
+    model = Map.get(args, "model")
+    env_api_key = args |> Map.get("encrypted_env_api_key") |> decrypt_env_api_key()
+
     with {:ok, resolved_key} <-
-           Providers.prepare_api_key(scope, @fallback_model, %{}, skip_quota: true),
+           Providers.prepare_api_key(scope, model, env_api_key, skip_quota: true),
          {:ok, raw_title} <- call_llm(resolved_key, user_prompt_text),
          title = String.trim(raw_title),
          false <- title == "",
@@ -109,5 +117,17 @@ defmodule FrontmanServer.Workers.GenerateTitle do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp encrypt_env_api_key(env_api_key) when env_api_key == %{}, do: nil
+
+  defp encrypt_env_api_key(env_api_key) do
+    env_api_key |> Jason.encode!() |> Vault.encrypt!() |> Base.encode64()
+  end
+
+  defp decrypt_env_api_key(nil), do: %{}
+
+  defp decrypt_env_api_key(encrypted) do
+    encrypted |> Base.decode64!() |> Vault.decrypt!() |> Jason.decode!()
   end
 end
