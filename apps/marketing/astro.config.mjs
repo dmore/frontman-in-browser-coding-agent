@@ -27,7 +27,6 @@ function buildDateMap(dir) {
 }
 
 const blogDateMap = buildDateMap(path.resolve(appRoot, "src/content/blog"));
-const glossaryDateMap = buildDateMap(path.resolve(appRoot, "src/content/glossary"));
 const lighthouseDateMap = buildDateMap(path.resolve(appRoot, "src/content/lighthouse"));
 const monorepoRoot = path.resolve(appRoot, "../..");
 
@@ -197,12 +196,9 @@ export default defineConfig({
       // Use the real pubDate for blog and lighthouse posts; fall back to
       // build date for everything else.
       const blogMatch = item.url.match(/\/blog\/([^/]+)\/?$/);
-      const glossaryMatch = item.url.match(/\/glossary\/([^/]+)\/?$/);
       const lighthouseMatch = item.url.match(/\/lighthouse\/([^/]+)\/?$/);
       if (blogMatch && blogDateMap.has(blogMatch[1])) {
         item.lastmod = blogDateMap.get(blogMatch[1]);
-      } else if (glossaryMatch && glossaryDateMap.has(glossaryMatch[1])) {
-        item.lastmod = glossaryDateMap.get(glossaryMatch[1]);
       } else if (lighthouseMatch && lighthouseDateMap.has(lighthouseMatch[1])) {
         item.lastmod = lighthouseDateMap.get(lighthouseMatch[1]);
       } else {
@@ -219,9 +215,6 @@ export default defineConfig({
       },
       tags: (item) => {
         if (/\/blog\/tags\//.test(item.url)) return item;
-      },
-      glossary: (item) => {
-        if (/\/glossary\//.test(item.url)) return item;
       },
       lighthouse: (item) => {
         if (/\/lighthouse\//.test(item.url)) return item;
