@@ -28,7 +28,7 @@ const youtubeVideoId = '-4GD1GYwH8Y'
 			<h1 class="hero-section__title">See it. Say it. Ship it.</h1>
 			<p class="hero-section__subtitle">Stop waiting on dev tickets to fix a button color. Frontman lets you click any element in your live product, describe what you want, and watch the change happen — no code, no handoff, no waiting.</p>
 			<div class="hero-section__cta">
-				<Button size="lg" style="white" link="#install" data-ga-event="click_start_building" data-ga-category="conversion" data-ga-label="hero">Try It Free</Button>
+				<Button size="lg" style="white" link="#install" classes="hero-section__primary-cta" data-ga-event="click_start_building" data-ga-category="conversion" data-ga-label="hero">Try It Free</Button>
 				<a href="https://discord.gg/xk8uXJSvhC" target="_blank" rel="noopener noreferrer" class="hero-section__community-link" data-ga-event="click_join_discord" data-ga-category="engagement" data-ga-label="hero">
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
 						<path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/>
@@ -170,46 +170,72 @@ const youtubeVideoId = '-4GD1GYwH8Y'
 	.hero-section__cta {
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
+		gap: 12px;
 		width: 100%;
-		align-items: center;
+		align-items: stretch;
 	}
-	.hero-section__cta .button {
+	.hero-section__cta .button,
+	.hero-section__github-link,
+	.hero-section__community-link {
 		width: 100%;
+		justify-content: center;
 	}
 	@media (min-width: 640px) {
 		.hero-section__cta {
 			flex-direction: row;
 			justify-content: center;
-			gap: 12px;
+			gap: 14px;
+			width: auto;
+			align-items: center;
+			flex-wrap: wrap;
+		}
+		.hero-section__cta .button,
+		.hero-section__github-link,
+		.hero-section__community-link {
 			width: auto;
 		}
-		.hero-section__cta .button {
-			width: auto;
-		}
+	}
+	.hero-section__primary-cta {
+		min-width: 190px;
+		box-shadow: 0 16px 40px rgba(134, 76, 255, 0.28);
 	}
 	.hero-section__github-link,
 	.hero-section__community-link {
 		display: inline-flex;
 		align-items: center;
-		gap: 8px;
-		color: white;
+		gap: 10px;
+		color: rgba(255, 255, 255, 0.96);
 		font-family: 'SF Pro Display', system-ui, helvetica, sans-serif;
-		font-weight: 480;
-		font-size: 14px;
+		font-weight: 560;
+		font-size: 15px;
 		line-height: 22px;
 		text-decoration: none;
 		white-space: nowrap;
-		background: rgba(255, 255, 255, 0.12);
-		padding: 8px 14px;
-		border-radius: 8px;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		transition: background 0.2s, border-color 0.2s;
+		background: rgba(16, 10, 28, 0.52);
+		padding: 15px 18px;
+		border-radius: 14px;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 12px 30px rgba(5, 5, 15, 0.22);
+		backdrop-filter: blur(18px);
+		-webkit-backdrop-filter: blur(18px);
+		transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 	}
 	.hero-section__github-link:hover,
 	.hero-section__community-link:hover {
-		background: rgba(255, 255, 255, 0.22);
-		border-color: rgba(255, 255, 255, 0.4);
+		background: rgba(28, 18, 48, 0.76);
+		border-color: rgba(199, 167, 255, 0.5);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 16px 36px rgba(5, 5, 15, 0.3);
+		transform: translateY(-1px);
+	}
+	.hero-section__github-link:focus-visible,
+	.hero-section__community-link:focus-visible {
+		outline: 2px solid rgba(255, 255, 255, 0.95);
+		outline-offset: 3px;
+	}
+	.hero-section__github-link svg,
+	.hero-section__community-link svg {
+		flex: none;
+		color: #c084fc;
 	}
 
 	/* -- Video (full width below text, hero centerpiece) -- */
