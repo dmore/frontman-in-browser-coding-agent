@@ -121,22 +121,29 @@ let make = (
   let usageInfo = Client__State.useSelector(Client__State.Selectors.usageInfo)
   let configOptions = Client__State.useSelector(Client__State.Selectors.configOptions)
   let selectedModelValue = Client__State.useSelector(Client__State.Selectors.selectedModelValue)
-  let hasProviderConfigured = Client__State.useSelector(Client__State.Selectors.hasAnyProviderConfigured)
-  let webPreviewIsSelecting = Client__State.useSelector(Client__State.Selectors.webPreviewIsSelecting)
+  let hasProviderConfigured = Client__State.useSelector(
+    Client__State.Selectors.hasAnyProviderConfigured,
+  )
+  let webPreviewIsSelecting = Client__State.useSelector(
+    Client__State.Selectors.webPreviewIsSelecting,
+  )
   let annotations = Client__State.useSelector(Client__State.Selectors.annotations)
-  let hasEnrichingAnnotations = Client__State.useSelector(Client__State.Selectors.hasEnrichingAnnotations)
+  let hasEnrichingAnnotations = Client__State.useSelector(
+    Client__State.Selectors.hasEnrichingAnnotations,
+  )
   let runtimeConfig = RuntimeConfig.read()
-  let hasEnvKey = RuntimeConfig.hasOpenrouterKey(runtimeConfig) || RuntimeConfig.hasAnthropicKey(runtimeConfig)
+  let hasEnvKey =
+    RuntimeConfig.hasOpenrouterKey(runtimeConfig) || RuntimeConfig.hasAnthropicKey(runtimeConfig)
   let hasAnyKey = hasProviderConfigured || hasEnvKey
 
-  let modelConfigOption = configOptions->Option.flatMap(opts =>
-    FrontmanAiFrontmanProtocol.FrontmanProtocol__ACP.findConfigOptionByCategory(opts, Model)
-  )
+  let modelConfigOption =
+    configOptions->Option.flatMap(opts =>
+      FrontmanAiFrontmanProtocol.FrontmanProtocol__ACP.findConfigOptionByCategory(opts, Model)
+    )
   let isModelsConfigLoading = configOptions->Option.isNone
 
   let isUsageExhausted = switch (usageInfo, hasAnyKey) {
-  | (Some({remaining: Some(remaining), hasServerKey: Some(true)}), false)
-    if remaining <= 0 => true
+  | (Some({remaining: Some(remaining), hasServerKey: Some(true)}), false) if remaining <= 0 => true
   | _ => false
   }
 
@@ -154,15 +161,20 @@ let make = (
 
   let handleSubmit = (~text: string, ~inputItems: array<Client__PromptInput.inputItem>) => {
     // Snapshot live annotations into serializable MessageAnnotation records
-    let messageAnnotations = annotations->Array.map(Client__Message.MessageAnnotation.fromAnnotation)
+    let messageAnnotations =
+      annotations->Array.map(Client__Message.MessageAnnotation.fromAnnotation)
 
-    let sendWithContent = (content) => {
+    let sendWithContent = content => {
       // Allow send if there's content OR annotations (annotations are first-class message content)
       switch Array.length(content) > 0 || Array.length(messageAnnotations) > 0 {
       | false => ()
       | true =>
         let sendMessage = (sessionId: string) => {
-          Client__State.Actions.addUserMessage(~sessionId, ~content, ~annotations=messageAnnotations)
+          Client__State.Actions.addUserMessage(
+            ~sessionId,
+            ~content,
+            ~annotations=messageAnnotations,
+          )
         }
         switch session {
         | Some(sess) => sendMessage(sess.sessionId)
@@ -196,8 +208,10 @@ let make = (
       let _ =
         fileData
         ->Array.map(((id, name, mediaType, dataUrl)) => {
-          Client__ImageLimits.constrainDataUrl(dataUrl, Client__ImageLimits.conservative)
-          ->Promise.then(constrained => {
+          Client__ImageLimits.constrainDataUrl(
+            dataUrl,
+            Client__ImageLimits.conservative,
+          )->Promise.then(constrained => {
             let actualMediaType = switch constrained->String.startsWith("data:image/jpeg") {
             | true => "image/jpeg"
             | false => mediaType
@@ -242,9 +256,11 @@ let make = (
         let stableGroup: ToolGroupTypes.toolGroup = switch prevCache->Dict.get(group.id) {
         | Some(prev)
           if Array.length(prev.toolCalls) == Array.length(group.toolCalls) &&
-            prev.toolCalls->Array.everyWithIndex((prevTc, i) => {
-              prevTc === group.toolCalls->Array.getUnsafe(i)
-            }) => prev
+            prev.toolCalls->Array.everyWithIndex(
+              (prevTc, i) => {
+                prevTc === group.toolCalls->Array.getUnsafe(i)
+              },
+            ) => prev
         | _ => group
         }
         newCache->Dict.set(stableGroup.id, stableGroup)
@@ -360,11 +376,7 @@ let make = (
       }
 
       <div key={messageId} className="frontman-content-auto">
-        <TodoListBlock
-          todos
-          isLoading
-          messageId
-        />
+        <TodoListBlock todos isLoading messageId />
       </div>
 
     | ErrorMsg(Message.Error(err), _) =>
@@ -411,7 +423,6 @@ let make = (
           messageId={thinkingMessageId}
         />
       </ScrollContainer.ContentWrapper>
-      <ScrollContainer.ScrollButton />
     </ScrollContainer>
     <Client__PlanDisplay entries=planEntries />
     <Client__SelectedElementDisplay />
@@ -433,8 +444,7 @@ let make = (
         modelConfigOption
         isModelsConfigLoading
         selectedModelValue
-        onModelChange={value =>
-          Client__State.Actions.setSelectedModelValue(~value)}
+        onModelChange={value => Client__State.Actions.setSelectedModelValue(~value)}
         isAgentRunning
         hasActiveACPSession
         disabled={isUsageExhausted}

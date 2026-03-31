@@ -1,3 +1,5 @@
+// --- Scroll context ---
+
 /**
  * Client__ScrollContainer - Scrollable container with stick-to-bottom behavior
  *
@@ -5,9 +7,6 @@
  * and IntersectionObserver for passive isAtBottom tracking.
  * Replaces use-stick-to-bottom to eliminate layout thrashing (see #177).
  */
-
-// --- Scroll context ---
-
 type scrollContext = {
   isAtBottom: bool,
   scrollToBottom: unit => unit,
@@ -49,11 +48,7 @@ module ScrollButton = {
     if isAtBottom {
       React.null
     } else {
-      <button
-        type_="button"
-        onClick={_ => scrollToBottom()}
-        className={buttonClassName}
-      >
+      <button type_="button" onClick={_ => scrollToBottom()} className={buttonClassName}>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
@@ -94,14 +89,13 @@ let make = (~className: option<string>=?, ~children: React.element) => {
   React.useEffect0(() => {
     switch (sentinelRef.current->Nullable.toOption, containerRef.current->Nullable.toOption) {
     | (Some(sentinel), Some(container)) =>
-      let observer = Bindings__IntersectionObserver.make(
-        entries => {
-          entries->Array.forEach(entry => {
+      let observer = Bindings__IntersectionObserver.make(entries => {
+        entries->Array.forEach(
+          entry => {
             setIsAtBottom(_ => entry.isIntersecting)
-          })
-        },
-        {root: container, rootMargin: "10px", threshold: [0.0]},
-      )
+          },
+        )
+      }, {root: container, rootMargin: "10px", threshold: [0.0]})
       observer->Bindings__IntersectionObserver.observe(sentinel)
       Some(() => Bindings__IntersectionObserver.disconnect(observer))
     | _ => None
@@ -111,8 +105,7 @@ let make = (~className: option<string>=?, ~children: React.element) => {
   let scrollToBottom = React.useCallback0(() => {
     switch sentinelRef.current->Nullable.toOption {
     | None => ()
-    | Some(sentinel) =>
-      sentinel->Bindings__DomScrollIntoView.scrollIntoView({behavior: "smooth"})
+    | Some(sentinel) => sentinel->Bindings__DomScrollIntoView.scrollIntoView({behavior: "smooth"})
     }
   })
 
@@ -129,8 +122,7 @@ let make = (~className: option<string>=?, ~children: React.element) => {
 
       let contentObserver = FrontmanBindings.ResizeObserver.make(_ => {
         let nearBottom =
-          el.scrollTop +. el.clientHeight->Int.toFloat >=
-            el.scrollHeight->Int.toFloat -. 150.0
+          el.scrollTop +. el.clientHeight->Int.toFloat >= el.scrollHeight->Int.toFloat -. 150.0
         if nearBottom {
           el.scrollTop = el.scrollHeight->Int.toFloat
         }
@@ -168,15 +160,14 @@ let make = (~className: option<string>=?, ~children: React.element) => {
 
   <Provider value={contextValue}>
     <div ref={ReactDOM.Ref.domRef(containerRef)} className={containerClassName} role="log">
-      <div ref={ReactDOM.Ref.domRef(contentRef)}>
-        {children}
-      </div>
+      <div ref={ReactDOM.Ref.domRef(contentRef)}> {children} </div>
+      // ScrollButton lives here — outside contentRef — so its show/hide does not
+      // affect the ResizeObserver-watched div and cannot trigger the snap feedback loop.
+      <ScrollButton />
       // Sentinel: overflow-anchor keeps it in view while the user is at the bottom.
       // All message wrappers have overflow-anchor: none (via .frontman-content-auto).
       <div
-        ref={ReactDOM.Ref.domRef(sentinelRef)}
-        className="frontman-scroll-anchor"
-        ariaHidden=true
+        ref={ReactDOM.Ref.domRef(sentinelRef)} className="frontman-scroll-anchor" ariaHidden=true
       />
     </div>
   </Provider>
@@ -194,8 +185,6 @@ module ContentWrapper = {
       }
     }, [className])
 
-    <div className={contentClassName}>
-      {children}
-    </div>
+    <div className={contentClassName}> {children} </div>
   }
 }
