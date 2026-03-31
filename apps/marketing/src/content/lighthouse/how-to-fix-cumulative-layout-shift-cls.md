@@ -54,7 +54,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 - **Set explicit dimensions on images and videos** — Always include `width` and `height` attributes, or use CSS [`aspect-ratio`](https://developer.mozilla.org/en-US/docs/Web/CSS/aspect-ratio)
 - **Reserve space for dynamic content** — Use `min-height` on containers that load content asynchronously
-- **Use `font-display: swap` or `optional`** — Prevents invisible text and reduces reflow when web fonts load. See the [font loading strategy](https://frontman.sh/glossary/font-loading-strategy/) glossary entry
+- **Use `font-display: swap` or `optional`** — Prevents invisible text and reduces reflow when web fonts load. A good font loading strategy helps avoid late layout shifts.
 - **Avoid inserting content above existing content** — Place banners, ads, and notices in reserved slots
 - **Use [`transform`](https://developer.mozilla.org/en-US/docs/Web/CSS/transform) for animations** — Animate `transform` and `opacity` instead of layout-triggering properties like `width`, `height`, or `margin`
 - **Use `content-visibility: auto`** — For off-screen sections, this tells the browser to skip layout until the element is near the viewport

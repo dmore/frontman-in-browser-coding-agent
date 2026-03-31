@@ -36,16 +36,6 @@ const blog = defineCollection({
 	})
 })
 
-const glossary = defineCollection({
-	loader: glob({ pattern: '**/*.md', base: './src/content/glossary' }),
-	schema: () =>
-		z.object({
-			title: z.string(),
-			description: z.string(),
-			pubDate: z.date()
-		})
-})
-
 const lighthouse = defineCollection({
 	loader: glob({ pattern: '**/*.md', base: './src/content/lighthouse' }),
 	schema: () =>
@@ -74,7 +64,6 @@ const docs = defineCollection({
 
 export const collections = {
 	blog,
-	glossary,
 	lighthouse,
 	docs,
 }

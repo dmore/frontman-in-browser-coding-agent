@@ -67,11 +67,11 @@ TBT sums the blocking portions of all long tasks between First Contentful Paint 
 
 ### What is the relationship between TBT and INP?
 
-TBT measures blocking during page load; [Interaction to Next Paint](https://frontman.sh/glossary/interaction-to-next-paint/) measures responsiveness to user interactions throughout the page's lifetime. They both reflect main-thread availability, so fixes that reduce TBT (code splitting, deferring scripts) often improve INP too.
+TBT measures blocking during page load, while Interaction to Next Paint measures responsiveness to user interactions throughout the page's lifetime. They both reflect main-thread availability, so fixes that reduce TBT, like code splitting and deferring scripts, often improve INP too.
 
 ### Does server-side rendering help TBT?
 
-Server-side rendering reduces time to first paint but does not eliminate TBT. The client still needs to hydrate components, which requires parsing and executing JavaScript. Partial hydration, progressive hydration, or [React Server Components](https://frontman.sh/glossary/react-server-components/) can reduce hydration cost.
+Server-side rendering reduces time to first paint but does not eliminate TBT. The client still needs to hydrate components, which requires parsing and executing JavaScript. Partial hydration, progressive hydration, or React Server Components can reduce hydration cost.
 
 ### What tools besides Lighthouse measure TBT?
 

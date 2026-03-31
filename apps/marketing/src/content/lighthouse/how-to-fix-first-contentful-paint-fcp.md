@@ -69,7 +69,7 @@ No. TTFB measures when the first byte of the HTML response arrives at the browse
 
 ### Can client-side rendering hurt FCP?
 
-Yes. Single-page applications that rely entirely on client-side rendering show a blank page until JavaScript downloads, parses, and executes. [Server-side rendering](https://frontman.sh/glossary/server-side-rendering/) or static generation sends pre-rendered HTML, allowing FCP to happen before JavaScript loads.
+Yes. Single-page applications that rely entirely on client-side rendering show a blank page until JavaScript downloads, parses, and executes. Server-side rendering or static generation sends pre-rendered HTML, allowing FCP to happen before JavaScript loads.
 
 ### What is the relationship between FCP and CLS?
 

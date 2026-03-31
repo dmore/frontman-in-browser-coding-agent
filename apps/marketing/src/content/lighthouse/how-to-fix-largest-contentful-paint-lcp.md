@@ -84,7 +84,7 @@ Yes. If the LCP element is a text block rendered with a web font, the browser wa
 
 ### Is LCP a Core Web Vital?
 
-LCP is one of the three [Core Web Vitals](https://frontman.sh/glossary/core-web-vitals/) used by Google as a ranking signal. The other two are [Cumulative Layout Shift](/lighthouse/how-to-fix-cumulative-layout-shift-cls/) and [Interaction to Next Paint](https://frontman.sh/glossary/interaction-to-next-paint/).
+LCP is one of the three Core Web Vitals used by Google as a ranking signal. The other two are [Cumulative Layout Shift](/lighthouse/how-to-fix-cumulative-layout-shift-cls/) and Interaction to Next Paint.
 
 ---
 

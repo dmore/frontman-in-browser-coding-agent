@@ -129,10 +129,6 @@ export const footerNavigationData: FooterData = {
 				{
 					subCategory: 'Lighthouse Guides',
 					subCategoryLink: '/lighthouse/'
-				},
-				{
-					subCategory: 'Glossary',
-					subCategoryLink: '/glossary/'
 				}
 			]
 		},

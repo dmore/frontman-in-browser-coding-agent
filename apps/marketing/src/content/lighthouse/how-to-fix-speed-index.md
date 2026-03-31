@@ -60,7 +60,7 @@ Frontman has a built-in Lighthouse tool. It runs the audit, reads the failing sc
 
 ### Is Speed Index a Core Web Vital?
 
-No. The three Core Web Vitals are [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/), [CLS](/lighthouse/how-to-fix-cumulative-layout-shift-cls/), and [Interaction to Next Paint](https://frontman.sh/glossary/interaction-to-next-paint/). Speed Index is a Lighthouse-specific lab metric.
+No. The three Core Web Vitals are [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/), [CLS](/lighthouse/how-to-fix-cumulative-layout-shift-cls/), and Interaction to Next Paint. Speed Index is a Lighthouse-specific lab metric.
 
 ### Why is my Speed Index high even though FCP is fast?
 

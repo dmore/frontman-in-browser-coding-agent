@@ -69,7 +69,7 @@ Lighthouse flags any script where a significant portion goes unused. As a rule o
 
 ### Does server-side rendering help with unused JavaScript?
 
-SSR helps [FCP](/lighthouse/how-to-fix-first-contentful-paint-fcp/) and [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/) because the browser receives pre-rendered HTML. But the same JavaScript still ships for hydration. To reduce unused JS in SSR apps, use [React Server Components](https://frontman.sh/glossary/react-server-components/), partial hydration, or island architecture (like [Astro](https://frontman.sh/glossary/astro/)).
+SSR helps [FCP](/lighthouse/how-to-fix-first-contentful-paint-fcp/) and [LCP](/lighthouse/how-to-fix-largest-contentful-paint-lcp/) because the browser receives pre-rendered HTML. But the same JavaScript still ships for hydration. To reduce unused JS in SSR apps, use React Server Components, partial hydration, or island architecture such as Astro.
 
 ### What is the difference between unused JavaScript and unminified JavaScript?
 
