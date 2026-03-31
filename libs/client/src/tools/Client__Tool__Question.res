@@ -11,7 +11,13 @@ let name = Tool.ToolNames.question
 let visibleToAgent = true
 let executionMode = FrontmanAiFrontmanProtocol.FrontmanProtocol__Tool.Interactive
 
-let description = `Ask the user one or more questions. Each question has a header, body text, and predefined options. The user can select options, type a custom answer, or skip. Use this tool when you need clarification or a decision from the user before proceeding.
+let description = `Ask the user one or more questions with predefined options. Use this tool when:
+- Offering a choice between multiple options or approaches (fix approaches, design alternatives, etc.)
+- Needing clarification on ambiguous requests
+- Asking for approval on destructive or irreversible actions
+- Requesting values that cannot be inferred from context
+
+The user selects options or types a custom answer via an interactive drawer. Never present choices in a text response — always structure them through this tool.
 
 Guidelines:
 - Keep questions concise and actionable
@@ -42,11 +48,7 @@ type output = {
   cancelled: bool,
 }
 
-let execute = async (
-  input: input,
-  ~taskId: string,
-  ~toolCallId: string,
-): toolResult<output> => {
+let execute = async (input: input, ~taskId: string, ~toolCallId: string): toolResult<output> => {
   // Create a promise that blocks until the user responds via the drawer.
   // The resolveOk/resolveError callbacks are stored in pendingQuestion state
   // so the task reducer can call them when the user submits/skips/cancels.

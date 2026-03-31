@@ -30,7 +30,7 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
     - The request is ambiguous in a way that would produce materially different results
     - The action is destructive or irreversible
     - You need a credential or value that cannot be inferred from context
-  - If you must ask: complete all non-blocked work first, then use the `question` tool. Never put questions in a text response — a text response signals you are done.
+  - If you must ask: use the `question` tool. Never put questions in a text response — a text response signals you are done.
 
   ## Rules
 
