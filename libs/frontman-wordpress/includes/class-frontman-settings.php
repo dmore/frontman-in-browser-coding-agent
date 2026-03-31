@@ -142,15 +142,31 @@ class Frontman_Settings {
 	 */
 	public function render_page(): void {
 		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Frontman Settings', 'frontman' ); ?></h1>
-			<form method="post" action="options.php">
-				<?php
-				settings_fields( 'frontman_settings_group' );
-				do_settings_sections( 'frontman-settings' );
-				submit_button();
-				?>
-			</form>
+		<div class="wrap frontman-admin-page">
+			<div class="frontman-admin-hero">
+				<div class="frontman-admin-brand">
+					<div class="frontman-admin-logo-wrap">
+						<img class="frontman-admin-logo" src="<?php echo esc_url( FRONTMAN_PLUGIN_URL . 'assets/frontman-logo.svg' ); ?>" alt="<?php esc_attr_e( 'Frontman logo', 'frontman' ); ?>">
+					</div>
+					<div class="frontman-admin-copy">
+						<p class="frontman-admin-eyebrow"><?php esc_html_e( 'Frontman for WordPress', 'frontman' ); ?></p>
+						<h1><?php esc_html_e( 'Frontman Settings', 'frontman' ); ?></h1>
+						<p><?php esc_html_e( 'Configure API keys and development settings, then launch Frontman from the WordPress sidebar.', 'frontman' ); ?></p>
+					</div>
+				</div>
+				<div class="frontman-admin-actions">
+					<a class="button button-primary" href="<?php echo esc_url( home_url( '/frontman' ) ); ?>"><?php esc_html_e( 'Open Frontman', 'frontman' ); ?></a>
+				</div>
+			</div>
+			<div class="frontman-admin-card">
+				<form method="post" action="options.php">
+					<?php
+					settings_fields( 'frontman_settings_group' );
+					do_settings_sections( 'frontman-settings' );
+					submit_button();
+					?>
+				</form>
+			</div>
 		</div>
 		<?php
 	}

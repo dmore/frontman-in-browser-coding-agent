@@ -30,12 +30,33 @@ class Frontman_UI {
 	 */
 	public function register(): void {
 		add_action( 'admin_menu', [ $this, 'add_admin_menu_link' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+	}
+
+	/**
+	 * Load branded admin styles for Frontman screens.
+	 *
+	 * @param string $hook_suffix Current admin page hook suffix.
+	 */
+	public function enqueue_admin_assets( string $hook_suffix ): void {
+		if ( ! in_array( $hook_suffix, [ 'toplevel_page_frontman', 'frontman_page_frontman-settings' ], true ) ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'frontman-admin',
+			FRONTMAN_PLUGIN_URL . 'assets/frontman-admin.css',
+			[],
+			FRONTMAN_VERSION,
+		);
 	}
 
 	/**
 	 * Add a menu link that points to /frontman (external to wp-admin).
 	 */
 	public function add_admin_menu_link(): void {
+		$logo_url = FRONTMAN_PLUGIN_URL . 'assets/frontman-logo.svg';
+
 		// Register a top-level menu page so Settings can be a submenu.
 		add_menu_page(
 			__( 'Frontman', 'frontman' ),
@@ -43,7 +64,7 @@ class Frontman_UI {
 			'manage_options',
 			'frontman',
 			'__return_null', // Callback unused — we redirect below.
-			'dashicons-edit-large',
+			$logo_url,
 			3,
 		);
 
@@ -66,6 +87,7 @@ class Frontman_UI {
 	 */
 	public function render_page( ?string $preview_path = null ): void {
 		$is_dev = (bool) $this->settings->get( 'dev_mode', false );
+		$logo_url = FRONTMAN_PLUGIN_URL . 'assets/frontman-logo.svg';
 
 		// "host" is the Frontman cloud server used for WebSocket, auth tokens, and API calls.
 		// In production: api.frontman.sh. In dev: frontman.local:4000 (or FRONTMAN_HOST env var).
@@ -127,13 +149,14 @@ class Frontman_UI {
 		?>
 <!DOCTYPE html>
 <html lang="en" class="dark">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title><?php esc_html_e( 'Frontman', 'frontman' ); ?></title>
-	<?php if ( $client_css ) : ?>
-	<link rel="stylesheet" href="<?php echo esc_url( $client_css ); ?>">
-	<?php endif; ?>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title><?php esc_html_e( 'Frontman', 'frontman' ); ?></title>
+		<link rel="icon" type="image/svg+xml" href="<?php echo esc_url( $logo_url ); ?>">
+		<?php if ( $client_css ) : ?>
+		<link rel="stylesheet" href="<?php echo esc_url( $client_css ); ?>">
+		<?php endif; ?>
 	<style>
 		html, body, #root {
 			height: 100%;
@@ -165,9 +188,23 @@ class Frontman_UI {
 		}
 
 		#frontman-warning-card h2 {
-			margin: 0 0 12px;
+			margin: 0;
 			font-size: 24px;
 			line-height: 1.2;
+		}
+
+		#frontman-warning-heading {
+			display: flex;
+			align-items: center;
+			gap: 14px;
+			margin: 0 0 12px;
+		}
+
+		#frontman-warning-heading img {
+			width: 42px;
+			height: 42px;
+			border-radius: 12px;
+			flex: 0 0 auto;
 		}
 
 		#frontman-warning-card p {
@@ -206,7 +243,10 @@ class Frontman_UI {
 	<?php endif; ?>
 	<div id="frontman-warning-overlay" hidden>
 		<div id="frontman-warning-card" role="dialog" aria-modal="true" aria-labelledby="frontman-warning-title">
-			<h2 id="frontman-warning-title"><?php esc_html_e( 'Use Frontman Carefully', 'frontman' ); ?></h2>
+			<div id="frontman-warning-heading">
+				<img src="<?php echo esc_url( $logo_url ); ?>" alt="" aria-hidden="true">
+				<h2 id="frontman-warning-title"><?php esc_html_e( 'Use Frontman Carefully', 'frontman' ); ?></h2>
+			</div>
 			<p><?php esc_html_e( 'Frontman for WordPress is experimental. The agent can change real content, templates, styles, menus, widgets, and settings on your site.', 'frontman' ); ?></p>
 			<ul>
 				<li><?php esc_html_e( 'Make sure you have a current backup before using it on an important site.', 'frontman' ); ?></li>
