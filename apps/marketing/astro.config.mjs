@@ -82,6 +82,14 @@ function validateDocsDescriptions() {
 export default defineConfig({
   site: "https://frontman.sh",
   trailingSlash: "always",
+  redirects: {
+    "/blog/gpt-5.4-support": "/blog/gpt-54-support/",
+    "/blog/mobile-app": "/blog/ai-coding-agents-blind-to-ui/",
+    "/blog/user-stories": "/blog/frontman-vs-cursor-vs-claude-code/",
+    "/blog/welcome": "/blog/introducing-frontman/",
+    "/blog/what-are-browser-aware-ai-coding-tools": "/blog/what-are-framework-aware-ai-coding-tools/",
+    "/blog/user-feedback": "/changelog/",
+  },
   vite: {
     plugins: [tailwindcss()],
     server: {
@@ -185,11 +193,6 @@ export default defineConfig({
     basePath: "frontman",
     serverName: "marketing",
   }), icon(), brokenLinksChecker(), sitemap({
-    filter: (page) =>
-      // Exclude empty placeholder pages and internal-only pages
-      !page.includes("/pricing") &&
-      !page.includes("/design-system") &&
-      !page.includes("/contact"),
     serialize: (item) => {
       // Use the real pubDate for blog and lighthouse posts; fall back to
       // build date for everything else.
