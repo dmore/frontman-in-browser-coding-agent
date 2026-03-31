@@ -31,6 +31,7 @@ class Frontman_UI {
 	public function register(): void {
 		add_action( 'admin_menu', [ $this, 'add_admin_menu_link' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
+		add_action( 'admin_head', [ $this, 'output_admin_menu_icon_css' ] );
 	}
 
 	/**
@@ -55,7 +56,7 @@ class Frontman_UI {
 	 * Add a menu link that points to /frontman (external to wp-admin).
 	 */
 	public function add_admin_menu_link(): void {
-		$logo_url = FRONTMAN_PLUGIN_URL . 'assets/frontman-logo.svg';
+		$menu_icon_url = FRONTMAN_PLUGIN_URL . 'assets/frontman-menu-icon.svg';
 
 		// Register a top-level menu page so Settings can be a submenu.
 		add_menu_page(
@@ -64,7 +65,7 @@ class Frontman_UI {
 			'manage_options',
 			'frontman',
 			'__return_null', // Callback unused — we redirect below.
-			$logo_url,
+			$menu_icon_url,
 			3,
 		);
 
@@ -73,6 +74,49 @@ class Frontman_UI {
 			wp_safe_redirect( home_url( '/frontman' ) );
 			exit;
 		} );
+	}
+
+	/**
+	 * Output admin menu icon styling so the Frontman icon matches
+	 * the native WordPress admin menu color scheme.
+	 */
+	public function output_admin_menu_icon_css(): void {
+		$default_icon = $this->get_menu_icon_data_uri( '#a7aaad' );
+		$active_icon  = $this->get_menu_icon_data_uri( '#ffffff' );
+		?>
+		<style>
+			#adminmenu .toplevel_page_frontman .wp-menu-image img {
+				display: none;
+			}
+
+			#adminmenu .toplevel_page_frontman .wp-menu-image {
+				background-image: url("<?php echo esc_attr( $default_icon ); ?>") !important;
+				background-position: center;
+				background-repeat: no-repeat;
+				background-size: 20px 20px;
+			}
+
+			#adminmenu .toplevel_page_frontman:hover .wp-menu-image,
+			#adminmenu .toplevel_page_frontman.current .wp-menu-image,
+			#adminmenu .toplevel_page_frontman.wp-has-current-submenu .wp-menu-image {
+				background-image: url("<?php echo esc_attr( $active_icon ); ?>") !important;
+			}
+		</style>
+		<?php
+	}
+
+	/**
+	 * Build a base64 menu icon data URI for the requested fill color.
+	 *
+	 * @param string $fill Hex fill color.
+	 */
+	private function get_menu_icon_data_uri( string $fill ): string {
+		$svg = sprintf(
+			'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="402 165 198 370" fill="none"><path d="M439.343 521.203C429.341 526.978 422.228 529.416 418.005 528.518C413.781 527.363 411.225 524.347 410.336 519.47C409.447 514.337 409.002 508.947 409.002 503.3L409.002 304.256C409.002 290.91 411.225 280.515 415.671 273.071C420.339 265.243 428.563 257.928 440.344 251.127L562.375 180.672C567.487 177.72 572.266 175.474 576.712 173.935C581.38 172.266 585.158 173.036 588.048 176.244C590.938 179.453 592.382 186.96 592.382 198.767C592.382 210.317 590.826 219.428 587.714 226.102C584.825 232.647 581.046 237.78 576.378 241.502C571.71 245.223 566.82 248.56 561.708 251.512L470.018 304.449L470.018 338.714L531.367 303.294C536.479 300.342 541.036 298.225 545.037 296.941C549.26 295.273 552.483 295.979 554.706 299.059C557.151 301.754 558.374 308.235 558.374 318.501C558.374 328.255 557.151 335.89 554.706 341.409C552.261 346.927 548.927 351.29 544.704 354.499C540.703 357.579 536.146 360.594 531.033 363.546L470.018 398.773L470.018 468.458C470.018 474.105 469.573 479.88 468.684 485.783C467.795 491.686 465.239 497.654 461.016 503.685C456.792 509.46 449.568 515.299 439.343 521.203Z" fill="%s"/></svg>',
+			$fill
+		);
+
+		return 'data:image/svg+xml;base64,' . base64_encode( $svg );
 	}
 
 	/**
