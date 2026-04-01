@@ -56,26 +56,36 @@ defmodule FrontmanServer.Tasks.Execution.ToolExecutor do
   ## Examples
 
       executor = ToolExecutor.make_executor(scope, task_id, mcp_tools: mcp_tools, llm_opts: llm_opts)
-      SwarmAi.run_blocking(agent, messages, executor)
+      SwarmAi.run_streaming(agent, messages, tool_executor: executor)
   """
   @spec make_executor(Scope.t(), String.t(), keyword()) ::
-          (SwarmAi.ToolCall.t() -> {:ok, String.t()} | {:error, String.t()})
+          ([SwarmAi.ToolCall.t()] -> [SwarmAi.ToolResult.t()])
   def make_executor(%Scope{} = scope, task_id, opts \\ []) do
     mcp_tools = Keyword.get(opts, :mcp_tools, [])
     mcp_tool_defs = Keyword.get(opts, :mcp_tool_defs, [])
     llm_opts = Keyword.fetch!(opts, :llm_opts)
 
-    fn tool_call ->
-      # Strip null values from arguments. OpenAI strict mode makes optional fields
-      # nullable (anyOf: [type, null]), so the model sends null instead of omitting.
-      # Tools expect missing keys, not null values.
-      tool_call = strip_null_arguments(tool_call)
+    fn tool_calls ->
+      Enum.map(tool_calls, &build_tool_result(&1, scope, task_id, mcp_tools, mcp_tool_defs, llm_opts))
+    end
+  end
 
+  defp build_tool_result(tool_call, scope, task_id, mcp_tools, mcp_tool_defs, llm_opts) do
+    # Strip null values from arguments. OpenAI strict mode makes optional fields
+    # nullable (anyOf: [type, null]), so the model sends null instead of omitting.
+    # Tools expect missing keys, not null values.
+    tool_call = strip_null_arguments(tool_call)
+
+    result =
       execute_tool_call(scope, task_id, tool_call,
         mcp_tools: mcp_tools,
         mcp_tool_defs: mcp_tool_defs,
         llm_opts: llm_opts
       )
+
+    case result do
+      {:ok, content} -> SwarmAi.ToolResult.make(tool_call.id, content, false)
+      {:error, reason} -> SwarmAi.ToolResult.make(tool_call.id, to_string(reason), true)
     end
   end
 
