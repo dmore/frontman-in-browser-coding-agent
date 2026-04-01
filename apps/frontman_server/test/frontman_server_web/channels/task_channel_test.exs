@@ -1062,7 +1062,8 @@ defmodule FrontmanServerWeb.TaskChannelTest do
         scope,
         task_id,
         [%{"type" => "text", "text" => "ask me a question"}],
-        []
+        [],
+        agent: %FrontmanServer.Testing.BlockingAgent{}
       )
 
       Tasks.add_agent_response(scope, task_id, "", %{tool_calls: [reqllm_tc]})
