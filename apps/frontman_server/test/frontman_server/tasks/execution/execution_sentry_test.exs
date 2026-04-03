@@ -9,9 +9,10 @@ defmodule FrontmanServer.Tasks.Execution.ExecutionSentryTest do
 
   use SwarmAi.Testing, async: false
 
+  import FrontmanServer.Test.Fixtures.Accounts
+  import FrontmanServer.Test.Fixtures.Tasks
+
   alias Ecto.Adapters.SQL.Sandbox
-  alias FrontmanServer.Accounts
-  alias FrontmanServer.Accounts.Scope
   alias FrontmanServer.Tasks
 
   setup do
@@ -20,18 +21,8 @@ defmodule FrontmanServer.Tasks.Execution.ExecutionSentryTest do
     pid = Sandbox.start_owner!(FrontmanServer.Repo, shared: true)
     on_exit(fn -> Sandbox.stop_owner(pid) end)
 
-    {:ok, user} =
-      Accounts.register_user(%{
-        email: "exec_sentry_#{System.unique_integer([:positive])}@test.local",
-        name: "Test User",
-        password: "testpassword123!"
-      })
-
-    scope = Scope.for_user(user)
-    task_id = Ecto.UUID.generate()
-    {:ok, ^task_id} = Tasks.create_task(scope, task_id, "test-framework")
-
-    Phoenix.PubSub.subscribe(FrontmanServer.PubSub, Tasks.topic(task_id))
+    scope = user_scope_fixture()
+    task_id = task_with_pubsub_fixture(scope, framework: "test-framework")
 
     {:ok, task_id: task_id, scope: scope}
   end
@@ -45,10 +36,8 @@ defmodule FrontmanServer.Tasks.Execution.ExecutionSentryTest do
       # ErrorLLM always returns {:error, reason}, triggering a :failed event
       agent = test_agent(%ErrorLLM{error: :llm_api_failure}, "ErrorSentryAgent")
 
-      user_content = [%{"type" => "text", "text" => "Hello"}]
-
       {:ok, _} =
-        Tasks.submit_user_message(scope, task_id, user_content, [],
+        Tasks.submit_user_message(scope, task_id, user_content("Hello"), [],
           agent: agent,
           env_api_key: %{"openrouter" => "sk-or-test"}
         )
@@ -89,10 +78,8 @@ defmodule FrontmanServer.Tasks.Execution.ExecutionSentryTest do
 
       agent = test_agent(error_llm, "ErrorSentryAgent")
 
-      user_content = [%{"type" => "text", "text" => "Trigger error"}]
-
       {:ok, _} =
-        Tasks.submit_user_message(scope, task_id, user_content, [],
+        Tasks.submit_user_message(scope, task_id, user_content("Trigger error"), [],
           agent: agent,
           env_api_key: %{"openrouter" => "sk-or-test"}
         )

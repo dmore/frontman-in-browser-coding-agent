@@ -3,8 +3,10 @@ defmodule FrontmanServerWeb.TasksChannelTest do
   # Shared sandbox mode is incompatible with async tests as it can interfere with other tests' connections
   use FrontmanServerWeb.ChannelCase, async: false
 
+  import FrontmanServer.Test.Fixtures.Accounts
+  import FrontmanServer.Test.Fixtures.Tasks
+
   alias AgentClientProtocol, as: ACP
-  alias FrontmanServer.Accounts.Scope
   alias FrontmanServerWeb.UserSocket
 
   setup %{scope: scope} do
@@ -309,8 +311,7 @@ defmodule FrontmanServerWeb.TasksChannelTest do
       assert_push("acp:message", %{"id" => 1, "result" => %{}})
 
       # Pre-create a task with a known ID
-      existing_id = Ecto.UUID.generate()
-      {:ok, ^existing_id} = FrontmanServer.Tasks.create_task(scope, existing_id, "nextjs")
+      existing_id = task_fixture(scope)
 
       # Try to create session with the same ID - should fail gracefully
       push(socket, "acp:message", %{
@@ -377,8 +378,7 @@ defmodule FrontmanServerWeb.TasksChannelTest do
     end
 
     test "returns sessions with correct fields", %{socket: socket, scope: scope} do
-      task_id = Ecto.UUID.generate()
-      {:ok, ^task_id} = FrontmanServer.Tasks.create_task(scope, task_id, "nextjs")
+      task_id = task_fixture(scope)
 
       ref = push(socket, "list_sessions", %{})
       assert_reply(ref, :ok, %{"sessions" => [session]})
@@ -390,11 +390,8 @@ defmodule FrontmanServerWeb.TasksChannelTest do
     end
 
     test "returns multiple sessions", %{socket: socket, scope: scope} do
-      task1_id = Ecto.UUID.generate()
-      {:ok, ^task1_id} = FrontmanServer.Tasks.create_task(scope, task1_id, "nextjs")
-
-      task2_id = Ecto.UUID.generate()
-      {:ok, ^task2_id} = FrontmanServer.Tasks.create_task(scope, task2_id, "nextjs")
+      task1_id = task_fixture(scope)
+      task2_id = task_fixture(scope)
 
       ref = push(socket, "list_sessions", %{})
       assert_reply(ref, :ok, %{"sessions" => sessions})
@@ -406,21 +403,10 @@ defmodule FrontmanServerWeb.TasksChannelTest do
     end
 
     test "only returns tasks for authenticated user", %{socket: socket, scope: scope} do
-      my_task_id = Ecto.UUID.generate()
-      {:ok, ^my_task_id} = FrontmanServer.Tasks.create_task(scope, my_task_id, "nextjs")
+      my_task_id = task_fixture(scope)
 
-      {:ok, other_user} =
-        FrontmanServer.Accounts.register_user(%{
-          email: "other_#{System.unique_integer([:positive])}@test.local",
-          name: "Other",
-          password: "testpassword123!"
-        })
-
-      other_scope = Scope.for_user(other_user)
-      other_task_id = Ecto.UUID.generate()
-
-      {:ok, ^other_task_id} =
-        FrontmanServer.Tasks.create_task(other_scope, other_task_id, "vite")
+      other_scope = user_scope_fixture()
+      _other_task_id = task_fixture(other_scope, framework: "vite")
 
       ref = push(socket, "list_sessions", %{})
       assert_reply(ref, :ok, %{"sessions" => [session]})
@@ -430,8 +416,7 @@ defmodule FrontmanServerWeb.TasksChannelTest do
 
   describe "delete_session" do
     test "deletes session and returns empty result", %{socket: socket, scope: scope} do
-      task_id = Ecto.UUID.generate()
-      {:ok, ^task_id} = FrontmanServer.Tasks.create_task(scope, task_id, "nextjs")
+      task_id = task_fixture(scope)
 
       # Verify task exists
       assert {:ok, _task} = FrontmanServer.Tasks.get_task(scope, task_id)
@@ -446,22 +431,11 @@ defmodule FrontmanServerWeb.TasksChannelTest do
 
     test "only deletes own sessions", %{socket: socket, scope: scope} do
       # Create task for current user
-      my_task_id = Ecto.UUID.generate()
-      {:ok, ^my_task_id} = FrontmanServer.Tasks.create_task(scope, my_task_id, "nextjs")
+      _my_task_id = task_fixture(scope)
 
       # Create another user and their task
-      {:ok, other_user} =
-        FrontmanServer.Accounts.register_user(%{
-          email: "other_delete_#{System.unique_integer([:positive])}@test.local",
-          name: "Other",
-          password: "testpassword123!"
-        })
-
-      other_scope = Scope.for_user(other_user)
-      other_task_id = Ecto.UUID.generate()
-
-      {:ok, ^other_task_id} =
-        FrontmanServer.Tasks.create_task(other_scope, other_task_id, "vite")
+      other_scope = user_scope_fixture()
+      other_task_id = task_fixture(other_scope, framework: "vite")
 
       # Trying to delete other user's task should fail (crashes the handler)
       # The channel will crash and the test process will receive an error
@@ -478,8 +452,7 @@ defmodule FrontmanServerWeb.TasksChannelTest do
     @describetag shared_sandbox: true
 
     setup %{scope: scope} do
-      task_id = Ecto.UUID.generate()
-      {:ok, ^task_id} = FrontmanServer.Tasks.create_task(scope, task_id, "nextjs")
+      task_id = task_fixture(scope)
       {:ok, task_id: task_id}
     end
 
@@ -643,18 +616,8 @@ defmodule FrontmanServerWeb.TasksChannelTest do
     test "returns error for unauthorized session (appears as not found)", %{socket: socket} do
       # Security: Implementation returns "not found" for unauthorized access
       # to avoid revealing whether a resource exists
-      {:ok, other_user} =
-        FrontmanServer.Accounts.register_user(%{
-          email: "other_load_#{System.unique_integer([:positive])}@test.local",
-          name: "Other",
-          password: "testpassword123!"
-        })
-
-      other_scope = Scope.for_user(other_user)
-      other_task_id = Ecto.UUID.generate()
-
-      {:ok, ^other_task_id} =
-        FrontmanServer.Tasks.create_task(other_scope, other_task_id, "vite")
+      other_scope = user_scope_fixture()
+      other_task_id = task_fixture(other_scope, framework: "vite")
 
       push(socket, "acp:message", acp_request(1, "session/load", %{"sessionId" => other_task_id}))
 

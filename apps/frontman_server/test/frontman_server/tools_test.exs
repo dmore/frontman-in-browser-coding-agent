@@ -1,24 +1,17 @@
 defmodule FrontmanServer.ToolsTest do
   use FrontmanServer.DataCase, async: false
 
-  alias FrontmanServer.Accounts
-  alias FrontmanServer.Accounts.Scope
+  import FrontmanServer.Test.Fixtures.Accounts
+  import FrontmanServer.Test.Fixtures.Tasks
+
   alias FrontmanServer.Tasks
   alias FrontmanServer.Tools
   alias FrontmanServer.Tools.Backend.Context
   alias FrontmanServer.Tools.TodoWrite
 
   setup do
-    {:ok, user} =
-      Accounts.register_user(%{
-        email: "tools_test_#{System.unique_integer([:positive])}@test.local",
-        name: "Test User",
-        password: "testpassword123!"
-      })
-
-    scope = Scope.for_user(user)
-    task_id = Ecto.UUID.generate()
-    {:ok, ^task_id} = Tasks.create_task(scope, task_id, "test-framework")
+    scope = user_scope_fixture()
+    task_id = task_fixture(scope, framework: "test-framework")
     {:ok, task} = Tasks.get_task(scope, task_id)
     {:ok, task_id: task_id, task: task, scope: scope}
   end

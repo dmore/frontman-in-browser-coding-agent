@@ -17,11 +17,11 @@ defmodule FrontmanServer.Observability.OtelHandlerTest do
   """
   use SwarmAi.Testing, async: false
 
+  import FrontmanServer.Test.Fixtures.Accounts
   import FrontmanServer.InteractionCase.Helpers
+  import FrontmanServer.Test.Fixtures.Tasks
 
   alias Ecto.Adapters.SQL.Sandbox
-  alias FrontmanServer.Accounts
-  alias FrontmanServer.Accounts.Scope
   alias FrontmanServer.Tasks
   alias FrontmanServer.Tasks.Interaction
 
@@ -55,22 +55,12 @@ defmodule FrontmanServer.Observability.OtelHandlerTest do
     pid = Sandbox.start_owner!(FrontmanServer.Repo, shared: true)
     on_exit(fn -> Sandbox.stop_owner(pid) end)
 
-    # Create a test user for scope
-    {:ok, user} =
-      Accounts.register_user(%{
-        email: "otel_test_#{System.unique_integer([:positive])}@test.local",
-        name: "Test User",
-        password: "testpassword123!"
-      })
-
-    scope = Scope.for_user(user)
+    scope = user_scope_fixture()
 
     ensure_ets_tables()
     :otel_simple_processor.set_exporter(:otel_exporter_pid, self())
 
-    task_id = Ecto.UUID.generate()
-    {:ok, ^task_id} = Tasks.create_task(scope, task_id, "test-framework")
-    Phoenix.PubSub.subscribe(FrontmanServer.PubSub, Tasks.topic(task_id))
+    task_id = task_with_pubsub_fixture(scope, framework: "test-framework")
 
     on_exit(&cleanup_ets_tables/0)
     {:ok, task_id: task_id, scope: scope}
