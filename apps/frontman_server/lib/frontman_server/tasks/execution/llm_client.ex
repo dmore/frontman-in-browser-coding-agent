@@ -76,7 +76,7 @@ end
 
 defimpl SwarmAi.LLM, for: FrontmanServer.Tasks.Execution.LLMClient do
   alias FrontmanServer.Tasks.Execution.LLMClient
-  alias FrontmanServer.Tasks.{StreamCleanup, StreamStallTimeout}
+  alias FrontmanServer.Tasks.{MessageOptimizer, StreamCleanup, StreamStallTimeout}
   alias SwarmAi.LLM.{Chunk, Usage}
   alias SwarmAi.Message
   alias SwarmAi.Message.ContentPart
@@ -101,11 +101,16 @@ defimpl SwarmAi.LLM, for: FrontmanServer.Tasks.Execution.LLMClient do
       |> Keyword.reject(fn {_k, v} -> v == [] end)
 
     # Convert messages, applying mcp_ prefix to tool names if required
-    # For OAuth with identity_override, prepend identity as first content block
+    # For OAuth with identity_override, prepend identity as first content block.
+    # Run MessageOptimizer here (not just at task startup) so that tool results
+    # accumulated inside the swarm loop are also truncated. Without this, long
+    # tool-calling chains accumulate dozens of full-size tool results and the
+    # request body grows until Anthropic closes the connection.
     reqllm_messages =
       messages
       |> Enum.map(&to_reqllm_message(&1, requires_mcp_prefix?))
       |> maybe_prepend_identity(identity_override)
+      |> MessageOptimizer.optimize()
 
     case ReqLLM.stream_text(client.model, reqllm_messages, llm_opts) do
       {:ok, response} ->
@@ -303,6 +308,7 @@ defimpl SwarmAi.LLM, for: FrontmanServer.Tasks.Execution.LLMClient do
     "LLM stream error: #{text}"
   end
 
+  # Log per-call message sizes to help diagnose large-request transport errors.
   # Prepend identity override as the first content block of system messages
   # This is used for Claude Code OAuth to inject "You are Claude Code..." identity
   defp maybe_prepend_identity(messages, nil), do: messages

@@ -22,7 +22,8 @@ defmodule FrontmanServer.Tasks.Execution do
   alias FrontmanServer.Providers
   alias FrontmanServer.Providers.{Model, Registry, ResolvedKey}
   alias FrontmanServer.Tasks.Execution.{Framework, RootAgent, ToolExecutor}
-  alias FrontmanServer.Tasks.{Interaction, MessageOptimizer, StreamStallTimeout, Task}
+  alias FrontmanServer.Tasks.{Interaction, StreamStallTimeout, Task}
+  alias FrontmanServer.Tools
   alias SwarmAi.Message
 
   @doc """
@@ -77,15 +78,18 @@ defmodule FrontmanServer.Tasks.Execution do
         messages =
           task.interactions
           |> Interaction.to_llm_messages()
-          |> MessageOptimizer.optimize()
           |> Enum.map(&to_swarm_message/1)
           |> maybe_constrain_images(api_key_info.provider)
 
         mcp_tool_defs = Keyword.get(opts, :mcp_tool_defs, [])
 
+        backend_tool_modules =
+          Keyword.get(opts, :backend_tool_modules, Tools.backend_tool_modules())
+
         submit_to_runtime(scope, agent, task_id, messages,
           api_key_info: api_key_info,
-          mcp_tool_defs: mcp_tool_defs
+          mcp_tool_defs: mcp_tool_defs,
+          backend_tool_modules: backend_tool_modules
         )
 
       {:error, reason} ->
@@ -143,6 +147,10 @@ defmodule FrontmanServer.Tasks.Execution do
   def handle_swarm_event(_scope, _task_id, {:terminated, _}),
     do: :agent_cancelled
 
+  # Paused — ToolResult and AgentPaused already persisted by SwarmDispatcher.
+  # Return :agent_paused so the channel can resolve the pending prompt and notify the client.
+  def handle_swarm_event(_scope, _task_id, {:paused, _}), do: :agent_paused
+
   # Tool calls are persisted by ToolExecutor; no channel action needed.
   def handle_swarm_event(_scope, _task_id, {:tool_call, _}), do: :ok
 
@@ -155,6 +163,7 @@ defmodule FrontmanServer.Tasks.Execution do
 
     mcp_tools = Map.get(agent, :tools, [])
     mcp_tool_defs = Keyword.get(opts, :mcp_tool_defs, [])
+    backend_tool_modules = Keyword.fetch!(opts, :backend_tool_modules)
 
     llm_opts =
       [api_key: resolved_key.api_key, model: resolved_key.model]
@@ -162,6 +171,7 @@ defmodule FrontmanServer.Tasks.Execution do
 
     tool_executor =
       ToolExecutor.make_executor(scope, task_id,
+        backend_tool_modules: backend_tool_modules,
         mcp_tools: mcp_tools,
         mcp_tool_defs: mcp_tool_defs,
         llm_opts: llm_opts

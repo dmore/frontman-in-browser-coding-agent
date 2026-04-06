@@ -13,18 +13,54 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
 
   import FrontmanServer.Test.Fixtures.Accounts
   import FrontmanServer.Test.Fixtures.Tasks
-  import FrontmanServer.Test.Fixtures.Tools, only: [question_args: 0, question_mcp_tool_defs: 0]
+  import FrontmanServer.Test.Fixtures.Tools,
+    only: [question_args: 0, question_mcp_tool_defs: 0, todo_args: 0]
 
   alias Ecto.Adapters.SQL.Sandbox
   alias FrontmanServer.Accounts.Scope
   alias FrontmanServer.Tasks
   alias FrontmanServer.Tasks.Interaction
+  alias FrontmanServer.Tools.MCP
   alias FrontmanServer.Workers.GenerateTitle
 
   @endpoint FrontmanServerWeb.Endpoint
   @acp_message AgentClientProtocol.event_acp_message()
 
   # -- Helpers ---------------------------------------------------------------
+
+  # Short timeout for tests that need to observe the pause path quickly.
+  defp short_timeout_question_mcp_tool_defs do
+    [
+      %MCP{
+        name: "question",
+        description: "Ask the user a question",
+        input_schema: %{
+          "type" => "object",
+          "properties" => %{"questions" => %{"type" => "array"}}
+        },
+        visible_to_agent: true,
+        timeout_ms: 200,
+        on_timeout: :pause_agent
+      }
+    ]
+  end
+
+  # Short-timeout tool that fails fast and lets the agent continue.
+  defp error_timeout_mcp_tool_defs do
+    [
+      %MCP{
+        name: "question",
+        description: "Ask the user a question",
+        input_schema: %{
+          "type" => "object",
+          "properties" => %{"questions" => %{"type" => "array"}}
+        },
+        visible_to_agent: true,
+        timeout_ms: 100,
+        on_timeout: :error
+      }
+    ]
+  end
 
   defp setup_task(_context) do
     pid = Sandbox.start_owner!(FrontmanServer.Repo, shared: true)
@@ -179,7 +215,12 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
       question_tc_id = "tc_question_#{System.unique_integer([:positive])}"
       question_tc = tool_call("question", question_args(), id: question_tc_id)
 
-      agent = test_agent(tool_then_complete_llm([question_tc], "Great choice!"), "QuestionAgent")
+      question_swarm_tools = MCP.to_swarm_tools(question_mcp_tool_defs())
+
+      agent =
+        test_agent(tool_then_complete_llm([question_tc], "Great choice!"), "QuestionAgent",
+          tools: question_swarm_tools
+        )
 
       {:ok, _} =
         Tasks.submit_user_message(scope, task_id, user_content("Ask me"), [],
@@ -213,10 +254,10 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
           _ -> false
         end)
 
-      assert tool_results != []
+      assert [_ | _] = tool_results
 
       completions = Enum.filter(task.interactions, &match?(%Interaction.AgentCompleted{}, &1))
-      assert completions != []
+      assert [_ | _] = completions
     end
   end
 
@@ -281,6 +322,343 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
     end
   end
 
+  # -- MCP tool timeout — DB invariant (bug 7) ---------------------------------
+
+  describe "interactive tool timeout — ToolResult DB persistence" do
+    setup :setup_task
+
+    test "ToolResult is persisted in DB when question tool times out", %{
+      task_id: task_id,
+      scope: scope
+    } do
+      question_tc_id = "tc_timeout_#{System.unique_integer([:positive])}"
+      question_tc = tool_call("question", question_args(), id: question_tc_id)
+
+      agent =
+        test_agent(tool_then_complete_llm([question_tc], "done"), "TimeoutAgent",
+          tools: MCP.to_swarm_tools(short_timeout_question_mcp_tool_defs())
+        )
+
+      {:ok, _} =
+        Tasks.submit_user_message(scope, task_id, user_content("Ask me"), [],
+          agent: agent,
+          mcp_tool_defs: short_timeout_question_mcp_tool_defs()
+        )
+
+      # Wait for the ParallelExecutor deadline to fire and the paused event to broadcast
+      assert_receive {:swarm_event, {:paused, _}}, 5_000
+
+      {:ok, task} = Tasks.get_task(scope, task_id)
+
+      # Bug 7: the old execute_mcp_tool had an after clause that persisted a
+      # ToolResult on timeout. The new code removed it, leaving an orphaned
+      # ToolCall — reconnecting clients see the tool as perpetually in-progress.
+      #
+      # Double-persist guard: EXIT handler and SwarmDispatcher both attempt to
+      # persist a ToolResult for on_timeout: :pause_agent. The unique DB index
+      # silently rejects the second write, but the wrong (less informative)
+      # message wins. Assert exactly one ToolResult so any double-persist is
+      # caught, and that the message comes from SwarmDispatcher (includes
+      # timeout_ms and policy name).
+      tool_results =
+        Enum.filter(task.interactions, fn
+          %Interaction.ToolResult{tool_call_id: ^question_tc_id} -> true
+          _ -> false
+        end)
+
+      assert length(tool_results) == 1,
+             "Expected exactly 1 ToolResult for the timed-out ToolCall, got #{length(tool_results)} — double-persist bug"
+
+      [tool_result] = tool_results
+      assert tool_result.is_error == true
+
+      assert tool_result.result =~ "on_timeout: :pause_agent",
+             "Expected ToolResult message to come from SwarmDispatcher (includes policy name), got: #{inspect(tool_result.result)}"
+    end
+  end
+
+  # -- MCP tool timeout with on_timeout: :error — DB invariant -------------------
+
+  describe "MCP tool timeout with on_timeout: :error" do
+    setup :setup_task
+
+    test "ToolResult is persisted in DB when MCP tool times out (on_timeout: :error)", %{
+      task_id: task_id,
+      scope: scope
+    } do
+      question_tc_id = "tc_error_timeout_#{System.unique_integer([:positive])}"
+      question_tc = tool_call("question", question_args(), id: question_tc_id)
+
+      # on_timeout: :error — the error ToolResult is fed back to the LLM, agent continues
+      agent =
+        test_agent(
+          tool_then_complete_llm([question_tc], "Understood, the tool timed out."),
+          "ErrorTimeoutAgent",
+          tools: MCP.to_swarm_tools(error_timeout_mcp_tool_defs())
+        )
+
+      {:ok, _} =
+        Tasks.submit_user_message(scope, task_id, user_content("Ask me"), [],
+          agent: agent,
+          mcp_tool_defs: error_timeout_mcp_tool_defs()
+        )
+
+      # Agent completes (not pauses) — the error result is sent to the LLM which responds
+      assert_receive {:swarm_event, {:completed, _}}, 5_000
+
+      {:ok, task} = Tasks.get_task(scope, task_id)
+
+      tool_call_interaction =
+        Enum.find(task.interactions, fn
+          %Interaction.ToolCall{tool_call_id: ^question_tc_id} -> true
+          _ -> false
+        end)
+
+      assert tool_call_interaction != nil,
+             "Expected a ToolCall interaction to be persisted"
+
+      # Every persisted ToolCall must have a matching ToolResult.
+      # Bug: the old execute_mcp_tool had an after clause that called Tasks.add_tool_result
+      # on timeout; the new code removed it. For on_timeout: :error, no ToolResult is
+      # ever written, leaving an orphaned ToolCall that shows as perpetually in-progress
+      # on reconnect.
+      tool_result =
+        Enum.find(task.interactions, fn
+          %Interaction.ToolResult{tool_call_id: ^question_tc_id} -> true
+          _ -> false
+        end)
+
+      assert tool_result != nil,
+             "Expected a ToolResult for the timed-out ToolCall — " <>
+               "every persisted ToolCall must have a matching ToolResult"
+
+      assert tool_result.is_error == true
+    end
+  end
+
+  # -- Agent pause — client notification (bug 8) --------------------------------
+
+  describe "interactive tool timeout — client notification" do
+    setup :setup_task_with_channel
+
+    test "session/update is pushed to client when agent pauses", %{
+      task_id: task_id,
+      socket: socket
+    } do
+      # Simulate the PubSub broadcast SwarmDispatcher emits after persisting AgentPaused.
+      # The channel must push a session/update to the client so the pending
+      # session/prompt RPC is resolved and the UI resets.
+      Phoenix.PubSub.broadcast(
+        FrontmanServer.PubSub,
+        Tasks.topic(task_id),
+        {:swarm_event, {:paused, {:timeout, "tc_fake", "question", 120_000}}}
+      )
+
+      # Flush the channel's message queue before asserting pushes
+      :sys.get_state(socket.channel_pid)
+
+      # Bug 8: handle_swarm_event for {:paused, _} returned :ok, which maps
+      # to {:noreply, socket} — no push, no RPC reply, client hangs forever.
+      assert_push(@acp_message, %{
+        "jsonrpc" => "2.0",
+        "method" => "session/update",
+        "params" => %{
+          "sessionId" => ^task_id,
+          "update" => %{"sessionUpdate" => "agent_turn_complete"}
+        }
+      })
+    end
+  end
+
+  # -- Backend tool execution — regression: parallel executor missing backend tool_defs ------
+
+  describe "backend tool execution — Tasks facade level" do
+    setup :setup_task
+
+    # Regression: execution.ex passes `tool_defs: mcp_tools` to Runtime.run, where
+    # `mcp_tools` only contains the agent's MCP (SwarmAi.Tool.t()) entries.
+    # Backend tools (todo_write, web_fetch) are absent from `tool_defs`, so
+    # ParallelExecutor.spawn_or_reject immediately returns "Unknown tool: <name>"
+    # instead of dispatching to the ToolExecutor closure.
+    test "todo_write executes successfully — not rejected as Unknown tool", %{
+      task_id: task_id,
+      scope: scope
+    } do
+      ref =
+        :telemetry_test.attach_event_handlers(self(), [[:swarm_ai, :tool, :execute, :stop]])
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      tc_id = "tc_todo_#{System.unique_integer([:positive])}"
+      todo_tc = tool_call("todo_write", todo_args(), id: tc_id)
+      agent = test_agent(tool_then_complete_llm([todo_tc], "Todos written."), "TodoAgent")
+
+      {:ok, _} =
+        Tasks.submit_user_message(scope, task_id, user_content("Write todos"), [], agent: agent)
+
+      assert_receive {:interaction, %Interaction.AgentCompleted{}}, 5_000
+
+      # The telemetry stop event fires with is_error: false when the backend tool
+      # actually executed, or is_error: true / output "Unknown tool: todo_write"
+      # when ParallelExecutor rejects it due to the missing tool_defs bug.
+      assert_receive {[:swarm_ai, :tool, :execute, :stop], ^ref, _measurements, meta}
+      assert meta.tool_name == "todo_write"
+
+      assert meta.is_error == false,
+             "todo_write returned an error — " <>
+               "backend tool was rejected by ParallelExecutor (missing from tool_defs). " <>
+               "Got: #{inspect(meta.output)}"
+    end
+  end
+
+  # -- Backend tool execution — channel level -----------------------------------
+
+  describe "backend tool execution — channel level" do
+    setup :setup_task_with_channel
+
+    test "todo_write executes through the full channel → executor pipeline", %{
+      task_id: task_id,
+      scope: scope,
+      socket: socket
+    } do
+      Phoenix.PubSub.subscribe(FrontmanServer.PubSub, Tasks.topic(task_id))
+
+      ref =
+        :telemetry_test.attach_event_handlers(self(), [[:swarm_ai, :tool, :execute, :stop]])
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      tc_id = "tc_todo_ch_#{System.unique_integer([:positive])}"
+      todo_tc = tool_call("todo_write", todo_args(), id: tc_id)
+      agent = test_agent(tool_then_complete_llm([todo_tc], "Todos written."), "TodoAgent")
+
+      {:ok, _} =
+        Tasks.submit_user_message(scope, task_id, user_content("Write todos"), [], agent: agent)
+
+      assert_receive {:interaction, %Interaction.AgentCompleted{}}, 5_000
+
+      # Channel should push session/update to the client on completion
+      :sys.get_state(socket.channel_pid)
+
+      assert_push(@acp_message, %{
+        "jsonrpc" => "2.0",
+        "method" => "session/update",
+        "params" => %{
+          "sessionId" => ^task_id,
+          "update" => %{"sessionUpdate" => "agent_turn_complete"}
+        }
+      })
+
+      # Same backend tool regression check as the Tasks facade level test
+      assert_receive {[:swarm_ai, :tool, :execute, :stop], ^ref, _measurements, meta}
+      assert meta.tool_name == "todo_write"
+
+      assert meta.is_error == false,
+             "todo_write returned an error through the channel pipeline — " <>
+               "backend tool was rejected by ParallelExecutor (missing from tool_defs). " <>
+               "Got: #{inspect(meta.output)}"
+    end
+  end
+
+  # Inline stubs — define before any describe block that passes them as
+  # backend_tool_modules, so the module atom resolves correctly at compile time.
+
+  defmodule CrashTool do
+    @moduledoc false
+    @behaviour FrontmanServer.Tools.Backend
+    def name, do: "crash_tool"
+    def description, do: "always crashes"
+    def parameter_schema, do: %{"type" => "object", "properties" => %{}}
+    def timeout_ms, do: 5_000
+    def on_timeout, do: :error
+    def execute(_args, _ctx), do: raise("boom")
+  end
+
+  defmodule HangTool do
+    @moduledoc false
+    @behaviour FrontmanServer.Tools.Backend
+    def name, do: "hang_tool"
+    def description, do: "hangs forever"
+    def parameter_schema, do: %{"type" => "object", "properties" => %{}}
+    def timeout_ms, do: 100
+    def on_timeout, do: :error
+    def execute(_args, _ctx), do: Process.sleep(:infinity)
+  end
+
+  # -- Backend tool crash — channel contract ------------------------------------
+
+  describe "backend tool crash — channel notification" do
+    setup :setup_task_with_channel
+
+    test "session/update agent_turn_complete is pushed when backend tool raises", %{
+      task_id: task_id,
+      scope: scope,
+      socket: socket
+    } do
+      tc_id = "tc_crash_ch_#{System.unique_integer([:positive])}"
+      crash_tc = tool_call("crash_tool", %{}, id: tc_id)
+      agent = test_agent(tool_then_complete_llm([crash_tc], "Handled."), "CrashChanAgent")
+
+      {:ok, _} =
+        Tasks.submit_user_message(scope, task_id, user_content("Do a thing"), [],
+          agent: agent,
+          backend_tool_modules: [CrashTool]
+        )
+
+      assert_receive {:interaction, %Interaction.AgentCompleted{}}, 5_000
+
+      # Channel must push agent_turn_complete so the client is not left hanging.
+      # The domain invariant (ToolResult in DB) is verified in the domain test above.
+      :sys.get_state(socket.channel_pid)
+
+      assert_push(@acp_message, %{
+        "jsonrpc" => "2.0",
+        "method" => "session/update",
+        "params" => %{
+          "sessionId" => ^task_id,
+          "update" => %{"sessionUpdate" => "agent_turn_complete"}
+        }
+      })
+    end
+  end
+
+  # -- Backend tool timeout — channel contract -----------------------------------
+
+  describe "backend tool timeout (ParallelExecutor) — channel notification" do
+    setup :setup_task_with_channel
+
+    test "session/update agent_turn_complete is pushed when ParallelExecutor deadline fires", %{
+      task_id: task_id,
+      scope: scope,
+      socket: socket
+    } do
+      tc_id = "tc_hang_ch_#{System.unique_integer([:positive])}"
+      hang_tc = tool_call("hang_tool", %{}, id: tc_id)
+
+      agent =
+        test_agent(tool_then_complete_llm([hang_tc], "Handled."), "HangChanAgent")
+
+      {:ok, _} =
+        Tasks.submit_user_message(scope, task_id, user_content("Do a thing"), [],
+          agent: agent,
+          backend_tool_modules: [HangTool]
+        )
+
+      assert_receive {:interaction, %Interaction.AgentCompleted{}}, 5_000
+
+      :sys.get_state(socket.channel_pid)
+
+      assert_push(@acp_message, %{
+        "jsonrpc" => "2.0",
+        "method" => "session/update",
+        "params" => %{
+          "sessionId" => ^task_id,
+          "update" => %{"sessionUpdate" => "agent_turn_complete"}
+        }
+      })
+    end
+  end
+
   # -- Terminated (end-to-end through channel) -------------------------------
 
   describe "supervisor-initiated termination (end-to-end)" do
@@ -297,16 +675,18 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
           [:frontman, :task, :stop]
         ])
 
+      Phoenix.PubSub.subscribe(FrontmanServer.PubSub, Tasks.topic(task_id))
+
       # Agent whose LLM exits with :shutdown — simulates supervisor kill
       agent = test_agent(%MockLLM{response: fn -> exit(:shutdown) end}, "TermAgent")
 
       {:ok, _} =
         Tasks.submit_user_message(scope, task_id, user_content("Hello"), [], agent: agent)
 
-      # Wait for the runtime to exit and SwarmDispatcher to broadcast
-      Process.sleep(500)
+      # Wait for SwarmDispatcher to broadcast the terminated event before checking the channel.
+      assert_receive {:swarm_event, {:terminated, _}}, 5_000
 
-      # Channel should receive the event via PubSub and push cancelled to client
+      # Flush the channel's message queue before asserting pushes.
       :sys.get_state(socket.channel_pid)
 
       assert_push(@acp_message, %{
@@ -334,6 +714,87 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
       # Verify telemetry
       assert_receive {[:frontman, :task, :stop], ^ref, _measurements, telemetry_meta}
       assert telemetry_meta.task_id == task_id
+    end
+  end
+
+  # -- Backend tool crash — DB invariant ----------------------------------------
+
+  describe "backend tool crash — ToolResult DB persistence" do
+    setup :setup_task
+
+    test "ToolResult is persisted when backend tool raises", %{
+      task_id: task_id,
+      scope: scope
+    } do
+      tc_id = "tc_crash_#{System.unique_integer([:positive])}"
+      crash_tc = tool_call("crash_tool", %{}, id: tc_id)
+      agent = test_agent(tool_then_complete_llm([crash_tc], "Handled the crash."), "CrashAgent")
+
+      {:ok, _} =
+        Tasks.submit_user_message(scope, task_id, user_content("Do a thing"), [],
+          agent: agent,
+          backend_tool_modules: [CrashTool]
+        )
+
+      assert_receive {:swarm_event, {:completed, _}}, 5_000
+
+      {:ok, task} = Tasks.get_task(scope, task_id)
+
+      # Every ToolCall in the LLM response must have a matching ToolResult in DB.
+      tool_result =
+        Enum.find(task.interactions, fn
+          %Interaction.ToolResult{tool_call_id: ^tc_id} -> true
+          _ -> false
+        end)
+
+      assert tool_result != nil,
+             "Expected a ToolResult for the crashed backend tool — " <>
+               "every dispatched ToolCall must have a matching ToolResult in DB"
+
+      assert tool_result.is_error == true
+    end
+  end
+
+  # -- Backend tool timeout (ParallelExecutor) — DB invariant -------------------
+
+  describe "backend tool timeout (ParallelExecutor) — ToolResult DB persistence" do
+    setup :setup_task
+
+    test "ToolResult is persisted when ParallelExecutor deadline fires before tool returns", %{
+      task_id: task_id,
+      scope: scope
+    } do
+      tc_id = "tc_hang_#{System.unique_integer([:positive])}"
+      hang_tc = tool_call("hang_tool", %{}, id: tc_id)
+
+      agent =
+        test_agent(
+          tool_then_complete_llm([hang_tc], "Handled the timeout."),
+          "HangAgent"
+        )
+
+      {:ok, _} =
+        Tasks.submit_user_message(scope, task_id, user_content("Do a thing"), [],
+          agent: agent,
+          backend_tool_modules: [HangTool]
+        )
+
+      # on_timeout: :error feeds the error back to the LLM, agent completes normally
+      assert_receive {:swarm_event, {:completed, _}}, 5_000
+
+      {:ok, task} = Tasks.get_task(scope, task_id)
+
+      tool_result =
+        Enum.find(task.interactions, fn
+          %Interaction.ToolResult{tool_call_id: ^tc_id} -> true
+          _ -> false
+        end)
+
+      assert tool_result != nil,
+             "Expected a ToolResult for the timed-out backend tool — " <>
+               "ParallelExecutor fires before await_backend_tool, bypassing persistence"
+
+      assert tool_result.is_error == true
     end
   end
 end

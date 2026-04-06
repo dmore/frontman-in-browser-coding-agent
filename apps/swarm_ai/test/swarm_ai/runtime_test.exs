@@ -1,6 +1,17 @@
 defmodule SwarmAi.RuntimeTest do
   use SwarmAi.Testing, async: true
 
+  alias SwarmAi.{ToolExecution, ToolResult}
+
+  # --- MFA callbacks for ToolExecution structs ---
+
+  def instant_run(tool_call), do: ToolResult.make(tool_call.id, "done", false)
+  def slow_run(tool_call) do
+    Process.sleep(500)
+    ToolResult.make(tool_call.id, "never", false)
+  end
+  def noop_timeout(_tool_call, _reason), do: :ok
+
   describe "child_spec/1" do
     test "requires :name option" do
       assert_raise KeyError, fn ->
@@ -78,6 +89,44 @@ defmodule SwarmAi.RuntimeTest do
 
       assert SwarmAi.Runtime.run(runtime, "task-dup", agent, "World", default_opts()) ==
                {:error, :already_running}
+    end
+
+    test "executor timeout_policy: :error returns error ToolResult and agent continues" do
+      runtime = start_runtime!()
+
+      # Executor returns Sync executions with 10ms timeout and :error policy.
+      slow_executor = fn tool_calls ->
+        Enum.map(tool_calls, fn tc ->
+          %ToolExecution.Sync{
+            tool_call: tc,
+            timeout_ms: 10,
+            on_timeout_policy: :error,
+            run: {__MODULE__, :slow_run, []},
+            on_timeout: {__MODULE__, :noop_timeout, []}
+          }
+        end)
+      end
+
+      llm =
+        SwarmAi.Testing.multi_turn_llm([
+          {:tool_calls, [%SwarmAi.ToolCall{id: "tc1", name: "test_tool", arguments: "{}"}],
+           "calling"},
+          {:complete, "done after timeout error"}
+        ])
+
+      agent = test_agent(llm)
+
+      {:ok, pid} =
+        SwarmAi.Runtime.run(runtime, "task-tool-def", agent, "Hello",
+          tool_executor: slow_executor
+        )
+
+      await_exit(pid)
+
+      # Should complete (error ToolResult returned to LLM, LLM responds with final message)
+      assert_receive {:test_event, "task-tool-def", {:completed, {:ok, "done after timeout error", _}},
+                      _metadata},
+                     3_000
     end
   end
 
@@ -306,6 +355,52 @@ defmodule SwarmAi.RuntimeTest do
     end
   end
 
+  describe "pause_agent" do
+    test "pause_agent tool timeout returns :paused result, no :failed event" do
+      runtime = start_runtime!()
+
+      # Executor returns Sync executions with 10ms timeout and :pause_agent policy.
+      pause_executor = fn tool_calls ->
+        Enum.map(tool_calls, fn tc ->
+          %ToolExecution.Sync{
+            tool_call: tc,
+            timeout_ms: 10,
+            on_timeout_policy: :pause_agent,
+            run: {__MODULE__, :slow_run, []},
+            on_timeout: {__MODULE__, :noop_timeout, []}
+          }
+        end)
+      end
+
+      llm = %SwarmAi.Testing.MockLLM{
+        response: fn ->
+          {:ok,
+           %SwarmAi.LLM.Response{
+             content: nil,
+             tool_calls: [%SwarmAi.ToolCall{id: "tc1", name: "test_tool", arguments: "{}"}],
+             usage: %SwarmAi.LLM.Usage{input_tokens: 10, output_tokens: 5},
+             raw: nil
+           }}
+        end
+      }
+
+      agent = test_agent(llm)
+
+      {:ok, pid} =
+        SwarmAi.Runtime.run(runtime, "task-pause", agent, "Hello",
+          tool_executor: pause_executor
+        )
+
+      await_exit(pid)
+
+      # Agent should not dispatch :completed or :failed — it paused
+      refute_receive {:test_event, "task-pause", {:completed, _}, _}, 200
+      refute_receive {:test_event, "task-pause", {:failed, _}, _}, 0
+      refute_receive {:test_event, "task-pause", {:crashed, _}, _}, 0
+      refute SwarmAi.Runtime.running?(runtime, "task-pause")
+    end
+  end
+
   describe "streaming events" do
     test "dispatches chunk and response events" do
       runtime = start_runtime!()
@@ -352,7 +447,15 @@ defmodule SwarmAi.RuntimeTest do
     Keyword.merge(
       [
         tool_executor: fn tool_calls ->
-          Enum.map(tool_calls, fn tc -> ToolResult.make(tc.id, "done", false) end)
+          Enum.map(tool_calls, fn tc ->
+            %ToolExecution.Sync{
+              tool_call: tc,
+              timeout_ms: 5_000,
+              on_timeout_policy: :error,
+              run: {__MODULE__, :instant_run, []},
+              on_timeout: {__MODULE__, :noop_timeout, []}
+            }
+          end)
         end
       ],
       extra

@@ -164,8 +164,8 @@ defmodule SwarmAi.Runtime do
   end
 
   # Wraps the caller's batch tool_executor with per-tool parallel execution.
-  # Each tool call in a batch is run concurrently via Task.Supervisor.
-  # Crashes in individual tool tasks are caught and converted to error ToolResults.
+  # The inner executor returns [ToolExecution.t()] describing how to run each tool.
+  # PE is the sole execution authority.
   defp wrap_executor_with_parallel(opts, task_supervisor) do
     case Keyword.fetch(opts, :tool_executor) do
       :error -> opts
@@ -173,30 +173,18 @@ defmodule SwarmAi.Runtime do
     end
   end
 
-  defp do_wrap_executor(opts, executor, task_supervisor) do
+  defp do_wrap_executor(opts, inner_executor, task_supervisor) do
     parallel_executor = fn tool_calls ->
-      task_supervisor
-      |> Task.Supervisor.async_stream_nolink(
-        tool_calls,
-        fn tc ->
-          [result] = executor.([tc])
-          result
-        end,
-        max_concurrency: 10,
-        ordered: true,
-        timeout: :timer.minutes(30)
-      )
-      |> Enum.zip(tool_calls)
-      |> Enum.map(&collect_tool_result/1)
+      executions = inner_executor.(tool_calls)
+
+      case SwarmAi.ParallelExecutor.run(executions, task_supervisor) do
+        {:ok, results} -> results
+        {:halt, _} = halt -> halt
+      end
     end
 
     Keyword.put(opts, :tool_executor, parallel_executor)
   end
-
-  defp collect_tool_result({{:ok, result}, _tc}), do: result
-
-  defp collect_tool_result({{:exit, reason}, tc}),
-    do: SwarmAi.ToolResult.make(tc.id, "Tool execution crashed: #{inspect(reason)}", true)
 
   defp run_registered_task(runtime, task, handshake) do
     registry = registry_name(runtime)
@@ -226,6 +214,20 @@ defmodule SwarmAi.Runtime do
 
         {:error, _, _} = err ->
           dispatch_event(dispatcher, task.key, {:failed, err}, task.event_context)
+
+        {:paused, {:pause_agent, tool_call_id, tool_name, timeout_ms} = reason} ->
+          :telemetry.execute(
+            [:swarm_ai, :runtime, :paused],
+            %{count: 1},
+            %{key: task.key, reason: reason}
+          )
+
+          dispatch_event(
+            dispatcher,
+            task.key,
+            {:paused, {:timeout, tool_call_id, tool_name, timeout_ms}},
+            task.event_context
+          )
       end
     after
       # Safety net — idempotent if already unregistered above.

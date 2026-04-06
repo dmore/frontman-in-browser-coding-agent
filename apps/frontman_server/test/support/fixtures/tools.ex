@@ -17,6 +17,8 @@ defmodule FrontmanServer.Test.Fixtures.Tools do
 
   alias FrontmanServer.Tasks
   alias FrontmanServer.Tools.Backend.Context
+  alias FrontmanServer.Tools.MCP
+  alias SwarmAi.ToolExecution
 
   @doc """
   Build a tool execution context.
@@ -27,10 +29,17 @@ defmodule FrontmanServer.Test.Fixtures.Tools do
   """
   @spec tool_context(FrontmanServer.Accounts.Scope.t(), map(), keyword()) :: Context.t()
   def tool_context(scope, task, llm_opts \\ []) do
-    # No-op executor for tests that don't actually execute sub-agents
+    # No-op description executor for tests that don't actually execute sub-agents.
+    # Returns ToolExecution.Sync structs (never passed to ParallelExecutor in tests).
     noop_executor = fn tool_calls ->
       Enum.map(tool_calls, fn tc ->
-        SwarmAi.ToolResult.make(tc.id, "mock result", false)
+        %ToolExecution.Sync{
+          tool_call: tc,
+          timeout_ms: 5_000,
+          on_timeout_policy: :error,
+          run: {__MODULE__, :noop_run, []},
+          on_timeout: {__MODULE__, :noop_timeout, []}
+        }
       end)
     end
 
@@ -85,23 +94,46 @@ defmodule FrontmanServer.Test.Fixtures.Tools do
   end
 
   @doc """
-  MCP tool definition list for the interactive `question` tool.
+  Structured todo_write tool input for backend tool tests.
   """
-  @spec question_mcp_tool_defs() :: [FrontmanServer.Tools.MCP.t()]
-  def question_mcp_tool_defs do
-    alias FrontmanServer.Tools.MCP
+  @spec todo_args() :: map()
+  def todo_args do
+    %{
+      "todos" => [
+        %{
+          "content" => "Fix the bug",
+          "active_form" => "Fixing the bug",
+          "status" => "pending",
+          "priority" => "medium"
+        }
+      ]
+    }
+  end
 
-    [
-      %MCP{
-        name: "question",
-        description: "Ask the user a question",
-        input_schema: %{
+  @doc false
+  def noop_run(_tool_call), do: SwarmAi.ToolResult.make("noop", "mock result", false)
+
+  @doc false
+  def noop_timeout(_tool_call, _reason), do: :ok
+
+  @doc """
+  MCP tool definition list for the interactive `question` tool.
+
+  Derived from wire-format data via MCP.from_map/1 so that changes to
+  the parsing layer are caught by tests that use this fixture.
+  """
+  @spec question_mcp_tool_defs() :: [MCP.t()]
+  def question_mcp_tool_defs do
+    MCP.from_maps([
+      %{
+        "name" => "question",
+        "description" => "Ask the user a question",
+        "inputSchema" => %{
           "type" => "object",
           "properties" => %{"questions" => %{"type" => "array"}}
         },
-        visible_to_agent: true,
-        execution_mode: :interactive
+        "executionMode" => "interactive"
       }
-    ]
+    ])
   end
 end
