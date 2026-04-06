@@ -365,7 +365,7 @@ jobs:
 
       - name: Fetch main branch for diff
         if: steps.changes.outputs.protocol == 'true'
-        run: git fetch origin main:main
+        run: git fetch origin main
 
       - name: Check for breaking changes
         if: steps.changes.outputs.protocol == 'true'

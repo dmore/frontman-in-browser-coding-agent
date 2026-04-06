@@ -10,25 +10,20 @@ module CP = FrontmanBindings.ChildProcess
 // frontman-protocol, so we can't import FrontmanCore__ChildProcess.
 let exec = async (command: string): result<CP.execResult, CP.execError> => {
   await Promise.make((resolve, _reject) => {
-    CP.nodeExec(
-      command,
-      {encoding: "utf8", maxBuffer: 50 * 1024 * 1024},
-      (err, stdout, stderr) => {
-        switch err->Nullable.toOption {
-        | None =>
-          resolve(Ok({CP.stdout, stderr}))
-        | Some(execErr) =>
-          resolve(
-            Error({
-              CP.code: execErr->CP.execExceptionCode->Nullable.toOption,
-              stdout,
-              stderr,
-              message: execErr->CP.execExceptionMessage,
-            }),
-          )
-        }
-      },
-    )
+    CP.nodeExec(command, {encoding: "utf8", maxBuffer: 50 * 1024 * 1024}, (err, stdout, stderr) => {
+      switch err->Nullable.toOption {
+      | None => resolve(Ok({CP.stdout, stderr}))
+      | Some(execErr) =>
+        resolve(
+          Error({
+            CP.code: execErr->CP.execExceptionCode->Nullable.toOption,
+            stdout,
+            stderr,
+            message: execErr->CP.execExceptionMessage,
+          }),
+        )
+      }
+    })
   })
 }
 
@@ -55,9 +50,7 @@ type change = {
 
 let main = async () => {
   // Get list of schema files changed vs main
-  let diffResult = await exec(
-    `git diff --name-status main -- ${schemasRelative}/`,
-  )
+  let diffResult = await exec(`git diff --name-status origin/main -- ${schemasRelative}/`)
 
   let diffOutput = switch diffResult {
   | Ok({stdout}) => stdout
@@ -86,8 +79,10 @@ let main = async () => {
       let parts = line->String.split("\t")
       switch parts {
       | [status, oldFile, newFile]
-        if status->String.startsWith("R") || status->String.startsWith("C") =>
-        // Renames/copies are a removal of the old path + addition of the new path
+        if status->String.startsWith("R") ||
+          status->String.startsWith(
+            "C",
+          ) => // Renames/copies are a removal of the old path + addition of the new path
         [{file: oldFile, kind: Removed}, {file: newFile, kind: Added}]
       | [status, file] =>
         let kind = switch status {
@@ -131,9 +126,7 @@ let main = async () => {
     for i in 0 to modified->Array.length - 1 {
       let change = modified->Array.getUnsafe(i)
       Console.log(`--- ${change.file} ---`)
-      let detailResult = await exec(
-        `git diff main -- ${change.file}`,
-      )
+      let detailResult = await exec(`git diff origin/main -- ${change.file}`)
       switch detailResult {
       | Ok({stdout}) => Console.log(stdout)
       | Error(_) => Console.log("  (could not generate diff)")
@@ -144,7 +137,9 @@ let main = async () => {
   // Fail CI on removed schemas (definitively breaking)
   if removed->Array.length > 0 {
     Console.error(
-      `\nBREAKING: ${removed->Array.length->Int.toString} schema(s) removed. This will break clients on older SDK versions.`,
+      `\nBREAKING: ${removed
+        ->Array.length
+        ->Int.toString} schema(s) removed. This will break clients on older SDK versions.`,
     )
     Console.error("If this is intentional, a reviewer must approve the PR.")
     exit(1)
@@ -153,7 +148,9 @@ let main = async () => {
   // Warn on modifications (potentially breaking, needs human review)
   if modified->Array.length > 0 {
     Console.log(
-      `\nWARNING: ${modified->Array.length->Int.toString} schema(s) modified. Review changes above for backwards compatibility.`,
+      `\nWARNING: ${modified
+        ->Array.length
+        ->Int.toString} schema(s) modified. Review changes above for backwards compatibility.`,
     )
   }
 }
