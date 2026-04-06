@@ -212,18 +212,22 @@ end
 
 defimpl ACPHistory, for: Interaction.AgentError do
   def to_history_items(
-        %Interaction.AgentError{error: error, timestamp: timestamp},
+        %Interaction.AgentError{error: error, category: category, timestamp: timestamp},
         session_id
       ) do
     # Replay errors as sessionUpdate: "error" notifications so the client
     # renders them the same as live agent errors.
-    [ACP.build_error_notification(session_id, error, timestamp)]
+    [ACP.build_error_notification(session_id, error, timestamp, category: category)]
   end
 end
 
 defimpl ACPHistory, for: Interaction.AgentPaused do
   # Pause state is communicated via task status, not as a history item.
   def to_history_items(%Interaction.AgentPaused{}, _session_id), do: []
+end
+
+defimpl ACPHistory, for: Interaction.AgentRetry do
+  def to_history_items(%Interaction.AgentRetry{}, _session_id), do: []
 end
 
 defimpl ACPHistory, for: Interaction.DiscoveredProjectRule do

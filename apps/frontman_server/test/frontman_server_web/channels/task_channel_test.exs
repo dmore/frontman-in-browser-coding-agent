@@ -1290,4 +1290,578 @@ defmodule FrontmanServerWeb.TaskChannelTest do
       assert tools_call == nil, "Resolved tool call should NOT be re-dispatched"
     end
   end
+
+  describe "transient error triggers retrying notification" do
+    setup %{scope: scope} do
+      {socket, task_id} = join_task_channel(scope)
+      complete_mcp_handshake(socket)
+      {:ok, socket: socket, task_id: task_id}
+    end
+
+    test "retryable error pushes error notification with retryAt", %{
+      socket: _socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      Phoenix.PubSub.broadcast(
+        FrontmanServer.PubSub,
+        Tasks.topic(task_id),
+        swarm_failed(error)
+      )
+
+      assert_push("acp:message", %{
+        "params" => %{
+          "update" => %{
+            "sessionUpdate" => "error",
+            "attempt" => 1,
+            "retryAt" => _
+          }
+        }
+      })
+    end
+
+    test "non-retryable error pushes error notification without retryAt", %{
+      socket: _socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Auth failed",
+        category: "auth",
+        retryable: false
+      }
+
+      Phoenix.PubSub.broadcast(
+        FrontmanServer.PubSub,
+        Tasks.topic(task_id),
+        swarm_failed(error)
+      )
+
+      assert_push("acp:message", %{
+        "params" => %{
+          "update" => %{"sessionUpdate" => "error", "message" => "Auth failed"}
+        }
+      })
+    end
+  end
+
+  describe "retry flow" do
+    setup %{scope: scope} do
+      {socket, task_id} = join_task_channel(scope)
+      complete_mcp_handshake(socket)
+      {:ok, socket: socket, task_id: task_id}
+    end
+
+    test "session/retry_turn notification creates AgentRetry interaction", %{
+      scope: scope,
+      socket: socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      retried_error_id = "error-#{task_id}-some-timestamp"
+
+      push(
+        socket,
+        "acp:message",
+        build_acp_request("session/retry_turn", nil, %{
+          "sessionId" => task_id,
+          "retriedErrorId" => retried_error_id
+        })
+      )
+
+      :sys.get_state(socket.channel_pid)
+
+      {:ok, task} = Tasks.get_task(scope, task_id)
+
+      assert Enum.any?(
+               task.interactions,
+               &match?(
+                 %FrontmanServer.Tasks.Interaction.AgentRetry{
+                   retried_error_id: ^retried_error_id
+                 },
+                 &1
+               )
+             )
+    end
+
+    test "second transient error increments retry attempt instead of resetting to 1", %{
+      socket: _socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 2, "retryAt" => _}}
+      })
+    end
+  end
+
+  describe "retry bug: stale coordinator after successful retry" do
+    setup %{scope: scope} do
+      {socket, task_id} = join_task_channel(scope)
+      complete_mcp_handshake(socket)
+      {:ok, socket: socket, task_id: task_id}
+    end
+
+    test "after successful retry, next transient error starts a fresh coordinator at attempt 1",
+         %{
+           socket: socket,
+           task_id: task_id
+         } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      # First transient error — coordinator starts
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      # Simulate the timer firing :fire_retry (skip 2s default delay)
+      send(socket.channel_pid, :fire_retry)
+      :sys.get_state(socket.channel_pid)
+
+      # Execution succeeds — handle_turn_ended should stop and clear the coordinator
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_completed())
+      :sys.get_state(socket.channel_pid)
+      flush_mailbox()
+
+      # New turn hits a transient error — should start fresh at attempt 1
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      # BUG: handle_turn_ended does not clear retry_coordinator, so handle_transient_error
+      # finds the stale pid and calls execution_failed/2 on it, reporting attempt 2.
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+    end
+  end
+
+  describe "cancelling retry via session/cancel" do
+    setup %{scope: scope} do
+      {socket, task_id} = join_task_channel(scope)
+      complete_mcp_handshake(socket)
+      {:ok, socket: socket, task_id: task_id}
+    end
+
+    test "ends the turn and leaves the channel operational", %{
+      socket: socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      # Trigger a transient error so retry state is created
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      # Verify retry state exists
+      %{assigns: assigns} = :sys.get_state(socket.channel_pid)
+      assert %FrontmanServer.Tasks.RetryCoordinator{} = assigns[:retry_state]
+
+      # Cancel via session/cancel (no execution running, so :not_running path)
+      push(
+        socket,
+        "acp:message",
+        build_acp_request("session/cancel", nil, %{"sessionId" => task_id})
+      )
+
+      :sys.get_state(socket.channel_pid)
+
+      # Channel pushes turn-complete with cancelled stop reason
+      assert_push("acp:message", %{
+        "params" => %{
+          "update" => %{"sessionUpdate" => "agent_turn_complete", "stopReason" => "cancelled"}
+        }
+      })
+
+      # Retry state cleared, channel alive
+      assert Process.alive?(socket.channel_pid)
+      %{assigns: assigns} = :sys.get_state(socket.channel_pid)
+      assert is_nil(assigns[:retry_state])
+    end
+  end
+
+  describe "retry bug: category missing from retrying notification" do
+    setup %{scope: scope} do
+      {socket, task_id} = join_task_channel(scope)
+      complete_mcp_handshake(socket)
+      {:ok, socket: socket, task_id: task_id}
+    end
+
+    test "retrying notification includes the actual error category, not 'unknown'", %{
+      socket: _socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+
+      # BUG: RetryCoordinator.schedule_retry/1 omits error_info.category from the
+      # :retrying_status tuple. The channel's handle_info handler cannot forward
+      # it to ACP.build_error_notification, which defaults category to "unknown".
+      assert_push("acp:message", %{
+        "params" => %{
+          "update" => %{
+            "sessionUpdate" => "error",
+            "category" => "rate_limit",
+            "attempt" => 1,
+            "retryAt" => _
+          }
+        }
+      })
+    end
+  end
+
+  describe "bug: session/cancel during retry countdown is silently ignored" do
+    setup %{scope: scope} do
+      {socket, task_id} = join_task_channel(scope)
+      complete_mcp_handshake(socket)
+      {:ok, socket: socket, task_id: task_id}
+    end
+
+    test "cancel during retry countdown stops the coordinator and ends the turn", %{
+      socket: socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      # Trigger a transient error — coordinator starts, enters countdown
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      # Verify retry state exists
+      %{assigns: %{retry_state: retry_state}} = :sys.get_state(socket.channel_pid)
+      assert %FrontmanServer.Tasks.RetryCoordinator{} = retry_state
+
+      # User clicks stop — sends session/cancel while NO execution is running
+      # (we're in the countdown window between retrying_status and trigger_retry)
+      push(
+        socket,
+        "acp:message",
+        build_acp_request("session/cancel", nil, %{"sessionId" => task_id})
+      )
+
+      :sys.get_state(socket.channel_pid)
+
+      # The coordinator should be cancelled and turn should end
+      assert_push("acp:message", %{
+        "params" => %{
+          "update" => %{"sessionUpdate" => "agent_turn_complete", "stopReason" => "cancelled"}
+        }
+      })
+
+      # Retry state should be cleared
+      %{assigns: assigns} = :sys.get_state(socket.channel_pid)
+      assert is_nil(assigns[:retry_state])
+
+      # Channel remains operational
+      assert Process.alive?(socket.channel_pid)
+    end
+
+    test "cancel during countdown prevents trigger_retry from firing", %{
+      socket: socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      # Cancel during countdown
+      push(
+        socket,
+        "acp:message",
+        build_acp_request("session/cancel", nil, %{"sessionId" => task_id})
+      )
+
+      :sys.get_state(socket.channel_pid)
+      flush_mailbox()
+
+      # Wait long enough for the retry delay to have fired (base_delay is 2s in prod,
+      # but we can't control it here — wait a reasonable amount)
+      Process.sleep(200)
+
+      # No trigger_retry should have caused a new execution or retrying_status push
+      refute_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 2}}
+      })
+    end
+
+    test "stale :fire_retry in mailbox after cancel does not start execution", %{
+      socket: socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      # Trigger transient error — retry state created, timer scheduled
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      # Cancel during countdown — clears retry state
+      push(
+        socket,
+        "acp:message",
+        build_acp_request("session/cancel", nil, %{"sessionId" => task_id})
+      )
+
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{
+          "update" => %{"sessionUpdate" => "agent_turn_complete", "stopReason" => "cancelled"}
+        }
+      })
+
+      flush_mailbox()
+
+      # Simulate the race: :fire_retry arrives AFTER cancel cleared retry_state
+      # (timer fired right before cancel, message was already in mailbox)
+      send(socket.channel_pid, :fire_retry)
+      :sys.get_state(socket.channel_pid)
+
+      # No execution should start — no error notification, no swarm activity
+      refute_push("acp:message", _)
+
+      # Channel still alive and retry_state still nil
+      assert Process.alive?(socket.channel_pid)
+      %{assigns: assigns} = :sys.get_state(socket.channel_pid)
+      assert is_nil(assigns[:retry_state])
+    end
+  end
+
+  describe "bug: execution_start_error during retry leaves zombie coordinator" do
+    setup %{scope: scope} do
+      {socket, task_id} = join_task_channel(scope)
+      complete_mcp_handshake(socket)
+      {:ok, socket: socket, task_id: task_id}
+    end
+
+    test "execution_start_error after trigger_retry cleans up the coordinator", %{
+      socket: socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      # Trigger a transient error — coordinator starts
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      %{assigns: %{retry_state: retry_state}} = :sys.get_state(socket.channel_pid)
+      assert %FrontmanServer.Tasks.RetryCoordinator{} = retry_state
+
+      # Timer fires :fire_retry → channel calls maybe_start_execution
+      # but execution fails to start (e.g. API key expired)
+      send(socket.channel_pid, :fire_retry)
+      :sys.get_state(socket.channel_pid)
+
+      # Simulate execution start failure
+      Phoenix.PubSub.broadcast(
+        FrontmanServer.PubSub,
+        Tasks.topic(task_id),
+        {:execution_start_error, "API key expired"}
+      )
+
+      :sys.get_state(socket.channel_pid)
+
+      # Channel should push an error notification for the start failure
+      assert_push("acp:message", %{
+        "params" => %{
+          "update" => %{"sessionUpdate" => "error", "message" => "API key expired"}
+        }
+      })
+
+      # The coordinator assign must be cleared so it doesn't corrupt future retries
+      %{assigns: assigns} = :sys.get_state(socket.channel_pid)
+      assert is_nil(assigns[:retry_state])
+    end
+
+    test "subsequent transient error after zombie cleanup starts fresh at attempt 1", %{
+      socket: socket,
+      task_id: task_id
+    } do
+      error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      # First: transient error → coordinator starts
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      # trigger_retry fires, but execution fails to start
+      send(socket.channel_pid, :fire_retry)
+      :sys.get_state(socket.channel_pid)
+
+      Phoenix.PubSub.broadcast(
+        FrontmanServer.PubSub,
+        Tasks.topic(task_id),
+        {:execution_start_error, "API key expired"}
+      )
+
+      :sys.get_state(socket.channel_pid)
+      flush_mailbox()
+
+      # Now a new transient error arrives — should start a FRESH coordinator at attempt 1
+      Phoenix.PubSub.broadcast(FrontmanServer.PubSub, Tasks.topic(task_id), swarm_failed(error))
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+    end
+  end
+
+  describe "bug: non-retryable error must clear retry_state" do
+    setup %{scope: scope} do
+      {socket, task_id} = join_task_channel(scope)
+      complete_mcp_handshake(socket)
+      {:ok, socket: socket, task_id: task_id}
+    end
+
+    test "non-retryable error after retry clears state for next turn", %{
+      socket: socket,
+      task_id: task_id
+    } do
+      retryable_error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Rate limited",
+        category: "rate_limit",
+        retryable: true
+      }
+
+      non_retryable_error = %FrontmanServer.Tasks.Execution.LLMError{
+        message: "Invalid API key",
+        category: "auth",
+        retryable: false
+      }
+
+      # First: transient error creates retry state at attempt 1
+      Phoenix.PubSub.broadcast(
+        FrontmanServer.PubSub,
+        Tasks.topic(task_id),
+        swarm_failed(retryable_error)
+      )
+
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+
+      # Retry fires, but execution hits a non-retryable error
+      send(socket.channel_pid, :fire_retry)
+      :sys.get_state(socket.channel_pid)
+
+      Phoenix.PubSub.broadcast(
+        FrontmanServer.PubSub,
+        Tasks.topic(task_id),
+        swarm_failed(non_retryable_error)
+      )
+
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{
+          "update" => %{"sessionUpdate" => "error", "message" => "Invalid API key"}
+        }
+      })
+
+      # retry_state MUST be cleared after the non-retryable error
+      %{assigns: assigns} = :sys.get_state(socket.channel_pid)
+      assert is_nil(assigns[:retry_state])
+
+      flush_mailbox()
+
+      # New turn: another transient error should start fresh at attempt 1
+      Phoenix.PubSub.broadcast(
+        FrontmanServer.PubSub,
+        Tasks.topic(task_id),
+        swarm_failed(retryable_error)
+      )
+
+      :sys.get_state(socket.channel_pid)
+
+      assert_push("acp:message", %{
+        "params" => %{"update" => %{"sessionUpdate" => "error", "attempt" => 1, "retryAt" => _}}
+      })
+    end
+  end
 end

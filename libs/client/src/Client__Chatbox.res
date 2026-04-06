@@ -118,6 +118,9 @@ let make = (
   let sessionInitialized = Client__State.useSelector(Client__State.Selectors.sessionInitialized)
   let planEntries = Client__State.useSelector(Client__State.Selectors.currentPlanEntries)
   let turnError = Client__State.useSelector(Client__State.Selectors.turnError)
+  let lastErrorId = Client__State.useSelector(Client__State.Selectors.lastErrorId)
+  let currentTaskId = Client__State.useSelector(Client__State.Selectors.currentTaskId)
+  let retryStatus = Client__State.useSelector(Client__State.Selectors.retryStatus)
   let usageInfo = Client__State.useSelector(Client__State.Selectors.usageInfo)
   let configOptions = Client__State.useSelector(Client__State.Selectors.configOptions)
   let selectedModelValue = Client__State.useSelector(Client__State.Selectors.selectedModelValue)
@@ -381,7 +384,16 @@ let make = (
 
     | ErrorMsg(Message.Error(err), _) =>
       <div key={`error-${Message.ErrorMessage.id(err)}`} className="frontman-content-auto">
-        <ErrorBanner error={Message.ErrorMessage.error(err)} />
+        <ErrorBanner
+          error={Message.ErrorMessage.error(err)}
+          category={Message.ErrorMessage.category(err)}
+          onRetry={switch currentTaskId {
+          | Some(taskId) =>
+            () =>
+              Client__State.Actions.retryTurn(~taskId, ~retriedErrorId=Message.ErrorMessage.id(err))
+          | None => () => ()
+          }}
+        />
       </div>
 
     // Handle any unexpected message types
@@ -410,10 +422,20 @@ let make = (
         ->Array.mapWithIndex((item, index) => renderDisplayItem(item, index))
         ->React.array}
 
-        // Error banner (shows when there's a turn error)
-        {switch turnError {
-        | Some(error) => <ErrorBanner error />
-        | None => React.null
+        // Error banner (shows when there's a turn error, or retry banner during countdown)
+        {switch (retryStatus, turnError, currentTaskId) {
+        | (Some(rs), _, _) => <Client__RetryBanner retryStatus=rs />
+        | (None, Some({message, category}), Some(taskId)) =>
+          <ErrorBanner
+            error=message
+            category
+            onRetry={() =>
+              Client__State.Actions.retryTurn(
+                ~taskId,
+                ~retriedErrorId=lastErrorId->Option.getOr(""),
+              )}
+          />
+        | _ => React.null
         }}
 
         // Thinking indicator (shows after last message when waiting for response)

@@ -89,6 +89,19 @@ module Task = {
   // Types
   // ============================================================================
 
+  type turnErrorInfo = {
+    id: string,
+    message: string,
+    category: string,
+  }
+
+  type retryStatus = {
+    attempt: int,
+    maxAttempts: int,
+    retryAt: float, // JS timestamp in ms, derived from ISO8601
+    error: string,
+  }
+
   type previewFrame = {
     url: string,
     contentDocument: option<WebAPI.DOMAPI.document>,
@@ -110,12 +123,7 @@ module Task = {
         isAnimationFrozen: bool,
       })
     // Unloaded: persisted but only metadata loaded
-    | Unloaded({
-        id: string,
-        title: string,
-        createdAt: float,
-        updatedAt: float,
-      })
+    | Unloaded({id: string, title: string, createdAt: float, updatedAt: float})
     // Loading: fetching full data from server
     | Loading({
         id: string,
@@ -145,7 +153,8 @@ module Task = {
         isAnimationFrozen: bool,
         isAgentRunning: bool,
         planEntries: array<ACPTypes.planEntry>,
-        turnError: option<string>,
+        turnError: option<turnErrorInfo>,
+        retryStatus: option<retryStatus>,
         // User-attached images keyed by URI (e.g., "attachment://att_abc123/image.png")
         // Accumulated across messages so the agent can save them to disk via write_file
         imageAttachments: Dict.t<Client__Message.fileAttachmentData>,
@@ -218,7 +227,13 @@ module Task = {
   let getPreviewFrame = (task: t, ~defaultUrl: string): previewFrame =>
     switch task {
     | New({previewFrame}) => previewFrame
-    | Unloaded(_) => {url: defaultUrl, contentDocument: None, contentWindow: None, deviceMode: Client__DeviceMode.defaultDeviceMode, orientation: Client__DeviceMode.defaultOrientation}
+    | Unloaded(_) => {
+        url: defaultUrl,
+        contentDocument: None,
+        contentWindow: None,
+        deviceMode: Client__DeviceMode.defaultDeviceMode,
+        orientation: Client__DeviceMode.defaultOrientation,
+      }
     | Loading({previewFrame}) | Loaded({previewFrame}) => previewFrame
     }
 
@@ -240,7 +255,8 @@ module Task = {
     switch task {
     | New({activePopupAnnotationId}) => activePopupAnnotationId
     | Unloaded(_) => None
-    | Loading({activePopupAnnotationId}) | Loaded({activePopupAnnotationId}) => activePopupAnnotationId
+    | Loading({activePopupAnnotationId})
+    | Loaded({activePopupAnnotationId}) => activePopupAnnotationId
     }
 
   let getIsAnimationFrozen = (task: t): bool =>
@@ -257,8 +273,7 @@ module Task = {
     }
 
   // Derived: is any selection mode active?
-  let getWebPreviewIsSelecting = (task: t): bool =>
-    getAnnotationMode(task) != Annotation.Off
+  let getWebPreviewIsSelecting = (task: t): bool => getAnnotationMode(task) != Annotation.Off
 
   // State predicates
   let isNew = (task: t): bool =>
@@ -311,7 +326,13 @@ module Task = {
   let makeNew = (~previewUrl: string): t => {
     New({
       clientId: WebAPI.Global.crypto->WebAPI.Crypto.randomUUID,
-      previewFrame: {url: previewUrl, contentDocument: None, contentWindow: None, deviceMode: Client__DeviceMode.defaultDeviceMode, orientation: Client__DeviceMode.defaultOrientation},
+      previewFrame: {
+        url: previewUrl,
+        contentDocument: None,
+        contentWindow: None,
+        deviceMode: Client__DeviceMode.defaultDeviceMode,
+        orientation: Client__DeviceMode.defaultOrientation,
+      },
       annotationMode: Annotation.Off,
       annotations: [],
       activePopupAnnotationId: None,
@@ -339,7 +360,13 @@ module Task = {
         createdAt,
         updatedAt,
         messages: Client__MessageStore.make(),
-        previewFrame: {url: previewUrl, contentDocument: None, contentWindow: None, deviceMode: Client__DeviceMode.defaultDeviceMode, orientation: Client__DeviceMode.defaultOrientation},
+        previewFrame: {
+          url: previewUrl,
+          contentDocument: None,
+          contentWindow: None,
+          deviceMode: Client__DeviceMode.defaultDeviceMode,
+          orientation: Client__DeviceMode.defaultOrientation,
+        },
         annotationMode: Annotation.Off,
         annotations: [],
         activePopupAnnotationId: None,
@@ -352,13 +379,16 @@ module Task = {
   // Atomic transition: New → Loaded (promotion when first message is sent)
   // Message insertion is handled separately by the task reducer's AddUserMessage
   // Preserves clientId for stable React keying (prevents iframe remount)
-  let newToLoaded = (
-    task: t,
-    ~id: string,
-    ~title: string,
-  ): t => {
+  let newToLoaded = (task: t, ~id: string, ~title: string): t => {
     switch task {
-    | New({clientId, previewFrame, annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen}) =>
+    | New({
+        clientId,
+        previewFrame,
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+      }) =>
       let timestamp = Date.now()
       Loaded({
         id,
@@ -375,6 +405,7 @@ module Task = {
         isAgentRunning: false,
         planEntries: [],
         turnError: None,
+        retryStatus: None,
         imageAttachments: Dict.make(),
         pendingQuestion: None,
       })
@@ -399,7 +430,13 @@ module Task = {
       createdAt,
       updatedAt: createdAt,
       messages: Client__MessageStore.fromArray(messages),
-      previewFrame: {url: previewUrl, contentDocument: None, contentWindow: None, deviceMode: Client__DeviceMode.defaultDeviceMode, orientation: Client__DeviceMode.defaultOrientation},
+      previewFrame: {
+        url: previewUrl,
+        contentDocument: None,
+        contentWindow: None,
+        deviceMode: Client__DeviceMode.defaultDeviceMode,
+        orientation: Client__DeviceMode.defaultOrientation,
+      },
       annotationMode: Annotation.Off,
       annotations: [],
       activePopupAnnotationId: None,
@@ -407,6 +444,7 @@ module Task = {
       isAgentRunning,
       planEntries: [],
       turnError: None,
+      retryStatus: None,
       imageAttachments: Dict.make(),
       pendingQuestion: None,
     })
@@ -424,7 +462,7 @@ module Task = {
     isAnimationFrozen: bool,
     isAgentRunning: bool,
     planEntries: array<ACPTypes.planEntry>,
-    turnError: option<string>,
+    turnError: option<turnErrorInfo>,
     pendingQuestion: option<Client__Question__Types.pendingQuestion>,
   }
 
@@ -450,31 +488,116 @@ module Task = {
     makeLoaded(~id=newId, ~title, ~previewUrl, ~createdAt=Date.now(), ~messages)
   }
 
-  let makeWithId = (~id: string, ~title: string, ~previewUrl: string, ~createdAt: float, ~updatedAt: option<float>=?): t => {
+  let makeWithId = (
+    ~id: string,
+    ~title: string,
+    ~previewUrl: string,
+    ~createdAt: float,
+    ~updatedAt: option<float>=?,
+  ): t => {
     let _ = previewUrl
     makeUnloaded(~id, ~title, ~createdAt, ~updatedAt=updatedAt->Option.getOr(createdAt))
   }
 
-  let makeWithIdLoaded = (~id: string, ~title: string, ~previewUrl: string, ~createdAt: float): t => {
+  let makeWithIdLoaded = (
+    ~id: string,
+    ~title: string,
+    ~previewUrl: string,
+    ~createdAt: float,
+  ): t => {
     makeLoaded(~id, ~title, ~previewUrl, ~createdAt)
   }
 
   let getLoadedData = (task: t): option<loadedData> => {
     switch task {
-    | Loaded({messages, annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen, isAgentRunning, planEntries, turnError, pendingQuestion}) =>
-      Some({messages: Client__MessageStore.toArray(messages), annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen, isAgentRunning, planEntries, turnError, pendingQuestion})
-    | Loading({messages, annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen}) =>
-      Some({messages: Client__MessageStore.toArray(messages), annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen, isAgentRunning: false, planEntries: [], turnError: None, pendingQuestion: None})
+    | Loaded({
+        messages,
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+        isAgentRunning,
+        planEntries,
+        turnError,
+        pendingQuestion,
+      }) =>
+      Some({
+        messages: Client__MessageStore.toArray(messages),
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+        isAgentRunning,
+        planEntries,
+        turnError,
+        pendingQuestion,
+      })
+    | Loading({
+        messages,
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+      }) =>
+      Some({
+        messages: Client__MessageStore.toArray(messages),
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+        isAgentRunning: false,
+        planEntries: [],
+        turnError: None,
+        pendingQuestion: None,
+      })
     | New({annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen}) =>
-      Some({messages: [], annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen, isAgentRunning: false, planEntries: [], turnError: None, pendingQuestion: None})
+      Some({
+        messages: [],
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+        isAgentRunning: false,
+        planEntries: [],
+        turnError: None,
+        pendingQuestion: None,
+      })
     | Unloaded(_) => None
     }
   }
 
   let updateLoadedData = (task: t, fn: loadedData => loadedData): t => {
     switch task {
-    | Loaded({id, clientId, title, createdAt, updatedAt, messages, previewFrame, annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen, isAgentRunning, planEntries, turnError, imageAttachments, pendingQuestion}) => {
-        let data = {messages: Client__MessageStore.toArray(messages), annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen, isAgentRunning, planEntries, turnError, pendingQuestion}
+    | Loaded({
+        id,
+        clientId,
+        title,
+        createdAt,
+        updatedAt,
+        messages,
+        previewFrame,
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+        isAgentRunning,
+        planEntries,
+        turnError,
+        retryStatus,
+        imageAttachments,
+        pendingQuestion,
+      }) => {
+        let data = {
+          messages: Client__MessageStore.toArray(messages),
+          annotationMode,
+          annotations,
+          activePopupAnnotationId,
+          isAnimationFrozen,
+          isAgentRunning,
+          planEntries,
+          turnError,
+          pendingQuestion,
+        }
         let updated = fn(data)
         Loaded({
           id,
@@ -491,12 +614,34 @@ module Task = {
           isAgentRunning: updated.isAgentRunning,
           planEntries: updated.planEntries,
           turnError: updated.turnError,
+          retryStatus,
           imageAttachments,
           pendingQuestion: updated.pendingQuestion,
         })
       }
-    | Loading({id, title, createdAt, updatedAt, messages, previewFrame, annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen}) => {
-        let data = {messages: Client__MessageStore.toArray(messages), annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen, isAgentRunning: false, planEntries: [], turnError: None, pendingQuestion: None}
+    | Loading({
+        id,
+        title,
+        createdAt,
+        updatedAt,
+        messages,
+        previewFrame,
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+      }) => {
+        let data = {
+          messages: Client__MessageStore.toArray(messages),
+          annotationMode,
+          annotations,
+          activePopupAnnotationId,
+          isAnimationFrozen,
+          isAgentRunning: false,
+          planEntries: [],
+          turnError: None,
+          pendingQuestion: None,
+        }
         let updated = fn(data)
         Loading({
           id,
@@ -511,8 +656,25 @@ module Task = {
           isAnimationFrozen: updated.isAnimationFrozen,
         })
       }
-    | New({clientId, previewFrame, annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen}) => {
-        let data = {messages: [], annotationMode, annotations, activePopupAnnotationId, isAnimationFrozen, isAgentRunning: false, planEntries: [], turnError: None, pendingQuestion: None}
+    | New({
+        clientId,
+        previewFrame,
+        annotationMode,
+        annotations,
+        activePopupAnnotationId,
+        isAnimationFrozen,
+      }) => {
+        let data = {
+          messages: [],
+          annotationMode,
+          annotations,
+          activePopupAnnotationId,
+          isAnimationFrozen,
+          isAgentRunning: false,
+          planEntries: [],
+          turnError: None,
+          pendingQuestion: None,
+        }
         let updated = fn(data)
         New({
           clientId,
@@ -538,6 +700,7 @@ let stripFileUriPrefix = (path: string): string => {
   if path->String.startsWith("file:///") {
     // Check if it's a Windows path (file:///C:/...)
     let afterPrefix = path->String.slice(~start=8, ~end=path->String.length) // Skip "file:///"
+
     // Windows paths have a drive letter followed by colon (e.g., "C:/...")
     if afterPrefix->String.length >= 2 && afterPrefix->String.charAt(1) == ":" {
       // Windows path - return without the file:/// prefix (keeps drive letter)
@@ -654,7 +817,9 @@ let screenshotMetaSchema: S.t<screenshotMeta> = S.object(s => {
 })
 
 // Convert a SourceLocation parent chain to a parentLocationMeta chain
-let rec parentLocationFromSourceLocation = (loc: Client__Types.SourceLocation.t): parentLocationMeta => {
+let rec parentLocationFromSourceLocation = (
+  loc: Client__Types.SourceLocation.t,
+): parentLocationMeta => {
   file: stripFileUriPrefix(loc.file),
   line: loc.line,
   column: loc.column,
@@ -664,7 +829,11 @@ let rec parentLocationFromSourceLocation = (loc: Client__Types.SourceLocation.t)
 }
 
 // Build _meta JSON for an annotation from its data + source location fields
-let makeAnnotationMeta = (annotation: Annotation.t, ~index: int, ~sourceLocation: option<Client__Types.SourceLocation.t>): JSON.t => {
+let makeAnnotationMeta = (
+  annotation: Annotation.t,
+  ~index: int,
+  ~sourceLocation: option<Client__Types.SourceLocation.t>,
+): JSON.t => {
   let (file, line, column, componentName, componentProps, parent) = switch sourceLocation {
   | Some(loc) => (
       Some(stripFileUriPrefix(loc.file)),
@@ -715,14 +884,22 @@ let parseDataUrl = (dataUrl: string): (string, string) => {
     | _ => panic(`parseDataUrl: unexpected data URL prefix format: ${prefix}`)
     }
     (mimeType, base64)
-  | _ => panic(`parseDataUrl: expected data:<mime>;base64,<data> format, got: ${dataUrl->String.slice(~start=0, ~end=50)}`)
+  | _ =>
+    panic(
+      `parseDataUrl: expected data:<mime>;base64,<data> format, got: ${dataUrl->String.slice(
+          ~start=0,
+          ~end=50,
+        )}`,
+    )
   }
 }
 
 // Build content blocks for a single annotation
 // Returns 1-2 blocks: resource block with annotation _meta, optional screenshot blob
 // Unwraps result<option<T>, string> to option<T> — errors are treated as absent for serialization
-let annotationToContentBlocks = (annotation: Annotation.t, ~index: int): array<ACPTypes.contentBlock> => {
+let annotationToContentBlocks = (annotation: Annotation.t, ~index: int): array<
+  ACPTypes.contentBlock,
+> => {
   let sourceLocation = annotation.sourceLocation->Result.getOr(None)
   let selector = annotation.selector->Result.getOr(None)
   let screenshot = annotation.screenshot->Result.getOr(None)
@@ -739,7 +916,10 @@ let annotationToContentBlocks = (annotation: Annotation.t, ~index: int): array<A
     }
   | None =>
     switch selector {
-    | Some(sel) => (`selector://${sel}`, `Annotated element: <${annotation.tagName}> matching ${sel}`)
+    | Some(sel) => (
+        `selector://${sel}`,
+        `Annotated element: <${annotation.tagName}> matching ${sel}`,
+      )
     | None => (`element://${annotation.tagName}`, `Annotated element: <${annotation.tagName}>`)
     }
   }
@@ -960,15 +1140,24 @@ let currentPageToContentBlock = (previewFrame: Task.previewFrame): ACPTypes.cont
   if Client__DeviceMode.isActive(previewFrame.deviceMode) {
     let emulationObj = Dict.make()
     emulationObj->Dict.set("active", JSON.Encode.bool(true))
-    let effectiveDims = Client__DeviceMode.getEffectiveDimensions(previewFrame.deviceMode, previewFrame.orientation)
+    let effectiveDims = Client__DeviceMode.getEffectiveDimensions(
+      previewFrame.deviceMode,
+      previewFrame.orientation,
+    )
     switch effectiveDims {
     | Some((w, h)) =>
       emulationObj->Dict.set("width", JSON.Encode.int(w))
       emulationObj->Dict.set("height", JSON.Encode.int(h))
     | None => ()
     }
-    emulationObj->Dict.set("name", JSON.Encode.string(Client__DeviceMode.getDeviceName(previewFrame.deviceMode)))
-    emulationObj->Dict.set("orientation", JSON.Encode.string(Client__DeviceMode.orientationToString(previewFrame.orientation)))
+    emulationObj->Dict.set(
+      "name",
+      JSON.Encode.string(Client__DeviceMode.getDeviceName(previewFrame.deviceMode)),
+    )
+    emulationObj->Dict.set(
+      "orientation",
+      JSON.Encode.string(Client__DeviceMode.orientationToString(previewFrame.orientation)),
+    )
     switch Client__DeviceMode.getDeviceDpr(previewFrame.deviceMode) {
     | Some(dpr) => emulationObj->Dict.set("dpr", JSON.Encode.float(dpr))
     | None => ()
@@ -1001,8 +1190,7 @@ let currentPageToContentBlock = (previewFrame: Task.previewFrame): ACPTypes.cont
     summaryParts
   }
 
-  let summaryText =
-    summaryParts->Array.filterMap(x => x)->Array.join(", ")
+  let summaryText = summaryParts->Array.filterMap(x => x)->Array.join(", ")
 
   let textResource: ACPTypes.textResourceContents = {
     uri: `page://${url}`,
@@ -1038,9 +1226,10 @@ let taskToContentBlocks = (task: Task.t): array<ACPTypes.contentBlock> => {
       let blocks = Array.concat(blocks, [currentPageToContentBlock(previewFrame)])
 
       // Add annotation content blocks
-      let annotationBlocks = annotations->Array.flatMapWithIndex((annotation, index) =>
-        annotationToContentBlocks(annotation, ~index)
-      )
+      let annotationBlocks =
+        annotations->Array.flatMapWithIndex((annotation, index) =>
+          annotationToContentBlocks(annotation, ~index)
+        )
       let blocks = Array.concat(blocks, annotationBlocks)
 
       blocks
@@ -1058,8 +1247,7 @@ let taskToPageContextBlocks = (task: Task.t): array<ACPTypes.contentBlock> => {
   | Task.Unloaded(_) => []
   | Task.New({previewFrame})
   | Task.Loading({previewFrame})
-  | Task.Loaded({previewFrame}) =>
-    [currentPageToContentBlock(previewFrame)]
+  | Task.Loaded({previewFrame}) => [currentPageToContentBlock(previewFrame)]
   }
 }
 
@@ -1081,25 +1269,19 @@ let rec parentLocationFromMessageAnnotation = (
 
 // Build _meta JSON for a MessageAnnotation — uses same annotationMeta schema
 // Unwraps result<option<T>, string> to option<T> — errors are treated as absent for serialization
-let makeMessageAnnotationMeta = (
-  annotation: Message.MessageAnnotation.t,
-  ~index: int,
-): JSON.t => {
+let makeMessageAnnotationMeta = (annotation: Message.MessageAnnotation.t, ~index: int): JSON.t => {
   let sourceLocation = annotation.sourceLocation->Result.getOr(None)
-  let (file, line, column, componentName, componentProps, parent) =
-    switch sourceLocation {
-    | Some(loc) => (
-        Some(stripFileUriPrefix(loc.file)),
-        Some(loc.line),
-        Some(loc.column),
-        loc.componentName,
-        loc.componentProps,
-        loc.parent->Option.map(p =>
-          parentLocationFromMessageAnnotation(p)->parentLocationToJson
-        ),
-      )
-    | None => (None, None, None, None, None, None)
-    }
+  let (file, line, column, componentName, componentProps, parent) = switch sourceLocation {
+  | Some(loc) => (
+      Some(stripFileUriPrefix(loc.file)),
+      Some(loc.line),
+      Some(loc.column),
+      loc.componentName,
+      loc.componentProps,
+      loc.parent->Option.map(p => parentLocationFromMessageAnnotation(p)->parentLocationToJson),
+    )
+  | None => (None, None, None, None, None, None)
+  }
 
   S.reverseConvertToJsonOrThrow(
     {
@@ -1133,12 +1315,16 @@ let annotationMetaToMessageAnnotation = (
   meta: annotationMeta,
   ~screenshot: option<string>,
 ): Message.MessageAnnotation.t => {
-  let rec parseParentLocation = (json: JSON.t): option<Message.MessageAnnotation.sourceLocation> => {
+  let rec parseParentLocation = (json: JSON.t): option<
+    Message.MessageAnnotation.sourceLocation,
+  > => {
     switch json->JSON.Decode.object {
     | Some(d) =>
-      switch (d->Dict.get("file")->Option.flatMap(JSON.Decode.string),
-              d->Dict.get("line")->Option.flatMap(JSON.Decode.float)->Option.map(Float.toInt),
-              d->Dict.get("column")->Option.flatMap(JSON.Decode.float)->Option.map(Float.toInt)) {
+      switch (
+        d->Dict.get("file")->Option.flatMap(JSON.Decode.string),
+        d->Dict.get("line")->Option.flatMap(JSON.Decode.float)->Option.map(Float.toInt),
+        d->Dict.get("column")->Option.flatMap(JSON.Decode.float)->Option.map(Float.toInt),
+      ) {
       | (Some(file), Some(line), Some(column)) =>
         Some({
           file,
@@ -1157,15 +1343,17 @@ let annotationMetaToMessageAnnotation = (
 
   let sourceLocation = switch (meta.file, meta.line, meta.column) {
   | (Some(file), Some(line), Some(column)) =>
-    Ok(Some({
-      Message.MessageAnnotation.file: file,
-      line,
-      column,
-      tagName: meta.tagName,
-      componentName: meta.componentName,
-      componentProps: meta.componentProps,
-      parent: meta.parent->Option.flatMap(parseParentLocation),
-    }))
+    Ok(
+      Some({
+        Message.MessageAnnotation.file,
+        line,
+        column,
+        tagName: meta.tagName,
+        componentName: meta.componentName,
+        componentProps: meta.componentProps,
+        parent: meta.parent->Option.flatMap(parseParentLocation),
+      }),
+    )
   | _ => Ok(None)
   }
 
@@ -1210,7 +1398,10 @@ let messageAnnotationToContentBlocks = (
     }
   | None =>
     switch selector {
-    | Some(sel) => (`selector://${sel}`, `Annotated element: <${annotation.tagName}> matching ${sel}`)
+    | Some(sel) => (
+        `selector://${sel}`,
+        `Annotated element: <${annotation.tagName}> matching ${sel}`,
+      )
     | None => (`element://${annotation.tagName}`, `Annotated element: <${annotation.tagName}>`)
     }
   }
@@ -1257,9 +1448,9 @@ let messageAnnotationToContentBlocks = (
 }
 
 // Build content blocks from an array of MessageAnnotations
-let messageAnnotationsToContentBlocks = (
-  annotations: array<Message.MessageAnnotation.t>,
-): array<ACPTypes.contentBlock> => {
+let messageAnnotationsToContentBlocks = (annotations: array<Message.MessageAnnotation.t>): array<
+  ACPTypes.contentBlock,
+> => {
   annotations->Array.flatMapWithIndex((annotation, index) =>
     messageAnnotationToContentBlocks(annotation, ~index)
   )
