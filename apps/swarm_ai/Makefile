@@ -4,7 +4,7 @@
 # Run 'make help' to see available commands
 
 .DEFAULT_GOAL := help
-.PHONY: help install test test-coverage lint build clean check precommit dialyzer credo hex-publish
+.PHONY: help install test test-coverage format lint build clean check precommit dialyzer credo hex-publish
 
 SHELL := /bin/bash
 
@@ -20,8 +20,11 @@ test: ## Run test suite
 test-coverage: ## Run tests with coverage report
 	MIX_ENV=test mix coveralls.cobertura
 
-lint: ## Run formatter and static analysis
+format: ## Auto-format Elixir files
 	mix format
+
+lint: ## Run formatter and static analysis
+	mix format --check-formatted
 	mix credo --strict
 
 build: ## Compile the project

@@ -4,7 +4,7 @@
 # Run 'make help' to see available commands
 
 .DEFAULT_GOAL := help
-.PHONY: help install test test-record test-coverage lint dev dev-container build clean check setup db-setup db-reset db-migrate db-seed assets-setup assets-build assets-deploy precommit dialyzer credo debug-task
+.PHONY: help install test test-record test-coverage format lint dev dev-container build clean check setup db-setup db-reset db-migrate db-seed assets-setup assets-build assets-deploy precommit dialyzer credo debug-task
 
 SHELL := /bin/bash
 
@@ -67,8 +67,11 @@ test-coverage: ## Run tests with coverage report
 	MIX_ENV=test mix ecto.migrate --quiet
 	MIX_ENV=test mix coveralls.cobertura
 
-lint: ## Run formatter and static analysis
+format: ## Auto-format Elixir files
 	mix format
+
+lint: ## Run formatter and static analysis
+	mix format --check-formatted
 	mix credo --strict
 
 dev: ## Start development server (resolves 1Password secrets via op run)
