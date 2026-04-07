@@ -117,7 +117,9 @@ defmodule FrontmanServer.Tasks.Execution.ToolExecutor do
     timeout_msg = "Tool #{tool_call.name} timed out"
     Logger.error("ToolExecutor: #{timeout_msg}")
     report_tool_timeout_sentry(tool_call, task_id)
+
     Tasks.add_tool_result(scope, task_id, %{id: tool_call.id, name: tool_call.name}, timeout_msg, true)
+
     :ok
   end
 
@@ -126,7 +128,9 @@ defmodule FrontmanServer.Tasks.Execution.ToolExecutor do
     # No Sentry report — this is expected cascade behaviour, not a timeout.
     cancel_msg = "Tool #{tool_call.name} cancelled (sibling tool paused agent)"
     Logger.info("ToolExecutor: #{cancel_msg}")
+
     Tasks.add_tool_result(scope, task_id, %{id: tool_call.id, name: tool_call.name}, cancel_msg, true)
+
     :ok
   end
 
@@ -140,7 +144,9 @@ defmodule FrontmanServer.Tasks.Execution.ToolExecutor do
     # Sibling cancelled by cancel_remaining — SwarmDispatcher never sees this tool,
     # so we must persist here to satisfy the ToolCall→ToolResult DB invariant.
     cancel_msg = "Tool #{tool_call.name} cancelled (sibling tool paused agent)"
+
     Tasks.add_tool_result(scope, task_id, %{id: tool_call.id, name: tool_call.name}, cancel_msg, true)
+
     :ok
   end
 
