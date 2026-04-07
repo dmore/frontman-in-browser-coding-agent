@@ -1,3 +1,9 @@
+# Frontman Server
+# Copyright (C) 2025 Frontman AI
+#
+# Licensed under the AGPL-3.0 — see LICENSE for details.
+# Additional terms apply — see AI-SUPPLEMENTARY-TERMS.md
+
 defmodule FrontmanServer.Providers.Model do
   import Kernel, except: [to_string: 1]
 

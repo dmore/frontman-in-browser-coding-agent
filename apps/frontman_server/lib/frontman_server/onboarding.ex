@@ -1,3 +1,9 @@
+# Frontman Server
+# Copyright (C) 2025 Frontman AI
+#
+# Licensed under the AGPL-3.0 — see LICENSE for details.
+# Additional terms apply — see AI-SUPPLEMENTARY-TERMS.md
+
 defmodule FrontmanServer.Onboarding do
   @moduledoc """
   Orchestrates user onboarding workflows that span multiple contexts.

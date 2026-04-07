@@ -1,3 +1,9 @@
+# Frontman Server
+# Copyright (C) 2025 Frontman AI
+#
+# Licensed under the AGPL-3.0 — see LICENSE for details.
+# Additional terms apply — see AI-SUPPLEMENTARY-TERMS.md
+
 alias AgentClientProtocol, as: ACP
 alias FrontmanServer.Tasks.Interaction
 alias FrontmanServerWeb.ACPHistory

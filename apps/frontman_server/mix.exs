@@ -18,6 +18,7 @@ defmodule FrontmanServer.MixProject do
         plt_local_path: "priv/plts",
         ignore_warnings: ".dialyzer_ignore.exs"
       ],
+      licenses: ["AGPL-3.0-only"],
       releases: [
         frontman_server: [
           include_executables_for: [:unix],

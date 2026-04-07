@@ -2,6 +2,14 @@
 
 Thanks for your interest in contributing to Frontman! This guide will help you get set up and productive quickly.
 
+## Contributor License Agreement (CLA)
+
+Before your first contribution can be merged, you must sign our [Contributor License Agreement](./CLA.md). This is required for all contributors — individual and corporate.
+
+**Why a CLA?** Frontman uses a dual-licensing model. The server (`apps/frontman_server/`) is open source under the [AGPL-3.0](./apps/frontman_server/LICENSE), and we also offer a [commercial license](./COMMERCIAL-LICENSE.md) for enterprise customers. The CLA ensures we can continue to offer both licensing options while protecting contributors' rights.
+
+**How it works:** When you submit your first pull request, the CLA Assistant bot will post a comment asking you to sign. You sign via GitHub OAuth — it takes about 30 seconds. Your signature covers all future contributions.
+
 ## Prerequisites
 
 - **Node.js** v24+
@@ -39,7 +47,7 @@ make dev
 frontman/
 ├── apps/
 │   ├── dogfooding/            # Internal testing app
-│   ├── frontman_server/       # Elixir/Phoenix backend
+│   ├── frontman_server/       # Elixir/Phoenix backend (AGPL-3.0)
 │   └── marketing/             # Marketing website
 ├── libs/
 │   ├── bindings/              # ReScript bindings for Node/browser APIs
@@ -133,6 +141,14 @@ This builds the package from scratch (ReScript + tsup bundle) and runs `npm publ
 
 ## License
 
-Contributions to client libraries (`libs/`) are licensed under the [Apache License 2.0](./LICENSE). Contributions to the server (`apps/frontman_server/`) are licensed under the [AGPL-3.0](./apps/frontman_server/LICENSE).
+Frontman uses a dual-licensing model:
 
-No CLA is required — the Apache 2.0 license (Section 5) covers contribution grants.
+- **Client libraries** (`libs/`): [Apache License 2.0](./LICENSE) — permissive, suitable for embedding in your applications
+- **Server** (`apps/frontman_server/`): [AGPL-3.0](./apps/frontman_server/LICENSE) — copyleft, with [AI supplementary terms](./AI-SUPPLEMENTARY-TERMS.md)
+- **Commercial use**: A [commercial license](./COMMERCIAL-LICENSE.md) is available for organizations that need different terms
+
+By submitting a contribution, you agree to the terms of the [Contributor License Agreement](./CLA.md).
+
+## Trademarks
+
+"Frontman" and "Frontman AI" are trademarks of Frontman AI. See the [Trademark Policy](./TRADEMARK.md) for usage guidelines.
