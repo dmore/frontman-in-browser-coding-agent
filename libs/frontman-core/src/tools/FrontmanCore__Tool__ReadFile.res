@@ -52,6 +52,7 @@ let execute = async (ctx: Tool.serverExecutionContext, input: input): Tool.toolR
   | Error(err) => Error(PathContext.formatError(err))
   | Ok(result) =>
     try {
+      let stats = await Fs.Promises.stat(result.resolvedPath)
       let content = await Fs.Promises.readFile(result.resolvedPath)
       let lines = content->String.split("\n")
       let totalLines = lines->Array.length
@@ -66,6 +67,8 @@ let execute = async (ctx: Tool.serverExecutionContext, input: input): Tool.toolR
         ~offset,
         ~limit,
         ~totalLines,
+        ~mtimeMs=Fs.mtimeMs(stats),
+        ~size=Fs.size(stats),
       )
 
       Ok({
