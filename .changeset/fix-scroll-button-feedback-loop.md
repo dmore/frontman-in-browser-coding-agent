@@ -1,5 +1,5 @@
 ---
-"@frontman/client": patch
+"@frontman-ai/client": patch
 ---
 
 fix: move ScrollButton outside contentRef to break ResizeObserver feedback loop
