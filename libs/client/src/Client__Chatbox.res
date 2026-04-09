@@ -12,7 +12,6 @@ module Log = FrontmanLogs.Logs.Make({
 })
 
 module Icons = Bindings__RadixUI__Icons
-module TaskTabs = Client__TaskTabs
 module Message = Client__State__Types.Message
 module RuntimeConfig = Client__RuntimeConfig
 
@@ -103,12 +102,7 @@ let groupMessages = (messages: array<Message.t>): array<displayItem> => {
 }
 
 @react.component
-let make = (
-  ~onSettingsClick: unit => unit,
-  ~showProviderNudge: bool=false,
-  ~onProviderNudgeDismiss: unit => unit=() => (),
-  ~onProviderNudgeCta: unit => unit=() => (),
-) => {
+let make = () => {
   let {session, createSession} = Client__FrontmanProvider.useFrontman()
 
   let messages = Client__State.useSelector(Client__State.Selectors.messages)
@@ -401,8 +395,7 @@ let make = (
     }
   }
 
-  <div className="relative flex flex-col h-full bg-[#180C2D] text-zinc-200">
-    <TaskTabs onSettingsClick showProviderNudge onProviderNudgeDismiss onProviderNudgeCta />
+  <div className="relative flex flex-col h-full bg-[#130d20] text-zinc-200">
     <Client__UpdateBanner />
     <ScrollContainer className="flex-grow overflow-x-hidden">
       <ScrollContainer.ContentWrapper>
@@ -447,7 +440,6 @@ let make = (
       </ScrollContainer.ContentWrapper>
     </ScrollContainer>
     <Client__PlanDisplay entries=planEntries />
-    <Client__SelectedElementDisplay />
     {switch (usageInfo, hasAnyKey) {
     | (Some({limit: Some(limit), remaining: Some(remaining), hasServerKey: Some(true)}), false) =>
       <div className="px-4 pb-1 text-xs text-zinc-400 shrink-0">
@@ -457,25 +449,28 @@ let make = (
       </div>
     | _ => React.null
     }}
-    {switch hasPendingQuestion {
-    | true => <Client__QuestionDrawer />
-    | false =>
-      <PromptInput
-        onSubmit={handleSubmit}
-        onCancel={Client__State.Actions.cancelTurn}
-        modelConfigOption
-        isModelsConfigLoading
-        selectedModelValue
-        onModelChange={value => Client__State.Actions.setSelectedModelValue(~value)}
-        isAgentRunning
-        hasActiveACPSession
-        disabled={isUsageExhausted}
-        disabledPlaceholder="Free requests exhausted. Add your API key in Settings to continue."
-        onSelectElement={Client__State.Actions.toggleWebPreviewSelection}
-        isSelecting={webPreviewIsSelecting}
-        hasAnnotations
-        isEnrichingAnnotations={hasEnrichingAnnotations}
-      />
-    }}
+    <div className="border-t border-white/8 shrink-0">
+      <Client__SelectedElementDisplay />
+      {switch hasPendingQuestion {
+      | true => <Client__QuestionDrawer />
+      | false =>
+        <PromptInput
+          onSubmit={handleSubmit}
+          onCancel={Client__State.Actions.cancelTurn}
+          modelConfigOption
+          isModelsConfigLoading
+          selectedModelValue
+          onModelChange={value => Client__State.Actions.setSelectedModelValue(~value)}
+          isAgentRunning
+          hasActiveACPSession
+          disabled={isUsageExhausted}
+          disabledPlaceholder="Free requests exhausted. Add your API key in Settings to continue."
+          onSelectElement={Client__State.Actions.toggleWebPreviewSelection}
+          isSelecting={webPreviewIsSelecting}
+          hasAnnotations
+          isEnrichingAnnotations={hasEnrichingAnnotations}
+        />
+      }}
+    </div>
   </div>
 }

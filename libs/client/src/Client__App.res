@@ -2,7 +2,6 @@ module SettingsModal = Client__SettingsModal
 
 @react.component
 let make = (~apiBaseUrl: string) => {
-  // Use Frontman context for ACP connection
   let {
     connectionState,
     sendPrompt,
@@ -14,8 +13,6 @@ let make = (~apiBaseUrl: string) => {
     _,
   } = Client__FrontmanProvider.useFrontman()
 
-  // Set up ACP session callbacks when ACP+Relay are ready
-  // Session creation is deferred until user sends first message (lazy session creation)
   React.useEffect(() => {
     switch connectionState {
     | Connected | SessionActive(_) =>
@@ -45,6 +42,7 @@ let make = (~apiBaseUrl: string) => {
   let (ftueState, setFtueState) = React.useState(() => Client__FtueState.get())
   let (showCelebration, setShowCelebration) = React.useState(() => false)
   let (providerNudgeDismissed, setProviderNudgeDismissed) = React.useState(() => false)
+  let (nudgeBubbleDismissed, setNudgeBubbleDismissed) = React.useState(() => false)
   let hasProviderConfigured = Client__State.useSelector(
     Client__State.Selectors.hasAnyProviderConfigured,
   )
@@ -79,18 +77,15 @@ let make = (~apiBaseUrl: string) => {
 
   // Provider nudge: show when FTUE is completed, no provider configured, and not dismissed this session.
   // Gate on usageInfo being loaded (Some) to avoid flashing the nudge before provider status is fetched.
-  let showProviderNudge = switch (
-    ftueState,
-    hasProviderConfigured,
-    providerNudgeDismissed,
-    usageInfo,
-  ) {
+  let showNudge = switch (ftueState, hasProviderConfigured, providerNudgeDismissed, usageInfo) {
   | (Client__FtueState.Completed, false, false, Some(_)) => true
   | _ => false
   }
+  let showProviderNudgeBubble = showNudge && !nudgeBubbleDismissed
+  let showProviderNudgeBadge = showNudge && nudgeBubbleDismissed
 
   let handleProviderNudgeDismiss = () => {
-    setProviderNudgeDismissed(_ => true)
+    setNudgeBubbleDismissed(_ => true)
   }
 
   let handleProviderNudgeCta = () => {
@@ -107,7 +102,7 @@ let make = (~apiBaseUrl: string) => {
     }
   }
 
-  <div className="flex h-screen w-screen bg-background text-foreground">
+  <div className="flex flex-col h-screen w-screen bg-background text-foreground">
     <SettingsModal
       open_={settingsOpen} onOpenChange={handleSettingsOpenChange} initialTab=?{settingsInitialTab}
     />
@@ -124,35 +119,42 @@ let make = (~apiBaseUrl: string) => {
       />
     | false => React.null
     }}
-    // Transparent overlay during resize to prevent iframe from stealing mouse events
-    {switch isResizing {
-    | true => <div className="fixed inset-0 z-50 cursor-col-resize" />
-    | false => React.null
-    }}
-    <div
-      style={{width: `${Int.toString(chatboxWidth)}px`}}
-      className="h-full border-r flex flex-col p-2 overflow-hidden relative shrink-0"
-    >
-      <Client__Chatbox
-        onSettingsClick={() => setSettingsOpen(_ => true)}
-        showProviderNudge
-        onProviderNudgeDismiss=handleProviderNudgeDismiss
-        onProviderNudgeCta=handleProviderNudgeCta
-      />
-      // Resize handle on right edge
+    // Top bar (sits above the panel split)
+    <Client__TopBar
+      chatboxWidth
+      onSettingsClick={() => setSettingsOpen(_ => true)}
+      showProviderNudgeBubble
+      showProviderNudgeBadge
+      onProviderNudgeDismiss=handleProviderNudgeDismiss
+      onProviderNudgeCta=handleProviderNudgeCta
+    />
+    // Main content area — flex row of chat + preview panels
+    <div className="flex flex-1 min-h-0 w-full">
+      // Transparent overlay during resize to prevent iframe from stealing mouse events
+      {switch isResizing {
+      | true => <div className="fixed inset-0 z-50 cursor-col-resize" />
+      | false => React.null
+      }}
       <div
-        className={[
-          "absolute top-0 right-0 w-1 h-full cursor-col-resize transition-colors",
-          switch isResizing {
-          | true => "bg-zinc-500"
-          | false => "hover:bg-zinc-600"
-          },
-        ]->Array.join(" ")}
-        onMouseDown={handleResizeMouseDown}
-      />
-    </div>
-    <div className="grow h-full p-1 min-w-0">
-      <Client__WebPreview />
+        style={{width: `${Int.toString(chatboxWidth)}px`}}
+        className="h-full border-r flex flex-col overflow-hidden relative shrink-0"
+      >
+        <Client__Chatbox />
+        // Resize handle on right edge
+        <div
+          className={[
+            "absolute top-0 right-0 w-1 h-full cursor-col-resize transition-colors",
+            switch isResizing {
+            | true => "bg-zinc-500"
+            | false => "hover:bg-zinc-600"
+            },
+          ]->Array.join(" ")}
+          onMouseDown={handleResizeMouseDown}
+        />
+      </div>
+      <div className="grow h-full min-w-0">
+        <Client__WebPreview />
+      </div>
     </div>
   </div>
 }
