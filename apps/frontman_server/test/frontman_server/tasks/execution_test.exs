@@ -20,7 +20,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
   alias Ecto.Adapters.SQL.Sandbox
   alias FrontmanServer.Accounts.Scope
   alias FrontmanServer.Tasks
-  alias FrontmanServer.Tasks.Interaction
+  alias FrontmanServer.Tasks.{ExecutionEvent, Interaction}
   alias FrontmanServer.Tools.MCP
   alias FrontmanServer.Workers.GenerateTitle
 
@@ -139,8 +139,48 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
 
       assert :ok = Tasks.cancel_execution(scope, task_id)
 
-      assert_receive {:swarm_event, {:cancelled, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :cancelled}}, 5_000
       refute SwarmAi.Runtime.running?(FrontmanServer.AgentRuntime, task_id)
+    end
+  end
+
+  # -- Concurrent execution prevention ----------------------------------------
+
+  describe "concurrent execution prevention" do
+    setup [:setup_sandbox, :setup_user, :setup_task]
+
+    test "second submit returns :already_running while agent is executing", %{
+      task_id: task_id,
+      scope: scope
+    } do
+      slow_llm = %MockLLM{response: "slow response", delay_ms: 5_000}
+      agent = test_agent(slow_llm, "SlowAgent")
+
+      {:ok, _interaction} =
+        Tasks.submit_user_message(scope, task_id, user_content("First"), [], agent: agent)
+
+      Process.sleep(100)
+      assert SwarmAi.Runtime.running?(FrontmanServer.AgentRuntime, task_id)
+
+      assert {:error, :already_running} =
+               Tasks.submit_user_message(scope, task_id, user_content("Second"), [], agent: agent)
+
+      # Only one completion should fire
+      assert_receive {:interaction, %Interaction.AgentCompleted{}}, 6_000
+      refute_receive {:interaction, %Interaction.AgentCompleted{}}, 500
+
+      # Only one agent response persisted — second message was rejected entirely
+      {:ok, task} = Tasks.get_task(scope, task_id)
+
+      agent_responses =
+        Enum.filter(task.interactions, &match?(%Interaction.AgentResponse{}, &1))
+
+      assert length(agent_responses) == 1
+
+      user_messages =
+        Enum.filter(task.interactions, &match?(%Interaction.UserMessage{}, &1))
+
+      assert length(user_messages) == 1
     end
   end
 
@@ -247,7 +287,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
           false
         )
 
-      assert_receive {:swarm_event, {:completed, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :completed}}, 5_000
 
       {:ok, task} = Tasks.get_task(scope, task_id)
 
@@ -349,7 +389,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
         )
 
       # Wait for the ParallelExecutor deadline to fire and the paused event to broadcast
-      assert_receive {:swarm_event, {:paused, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :paused}}, 5_000
 
       {:ok, task} = Tasks.get_task(scope, task_id)
 
@@ -407,7 +447,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
         )
 
       # Agent completes (not pauses) — the error result is sent to the LLM which responds
-      assert_receive {:swarm_event, {:completed, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :completed}}, 5_000
 
       {:ok, task} = Tasks.get_task(scope, task_id)
 
@@ -454,7 +494,11 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
       Phoenix.PubSub.broadcast(
         FrontmanServer.PubSub,
         Tasks.topic(task_id),
-        {:swarm_event, {:paused, {:timeout, "tc_fake", "question", 120_000}}}
+        {:execution_event,
+         %ExecutionEvent{
+           type: :paused,
+           payload: {:timeout, "tc_fake", "question", 120_000}
+         }}
       )
 
       # Flush the channel's message queue before asserting pushes
@@ -687,7 +731,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
         Tasks.submit_user_message(scope, task_id, user_content("Hello"), [], agent: agent)
 
       # Wait for SwarmDispatcher to broadcast the terminated event before checking the channel.
-      assert_receive {:swarm_event, {:terminated, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :terminated}}, 5_000
 
       # Flush the channel's message queue before asserting pushes.
       :sys.get_state(socket.channel_pid)
@@ -746,7 +790,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
       {:ok, _} =
         Tasks.submit_user_message(scope, task_id, user_content("Hello"), [], agent: agent)
 
-      assert_receive {:swarm_event, {:crashed, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :crashed}}, 5_000
 
       :sys.get_state(socket.channel_pid)
 
@@ -803,7 +847,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
       {:ok, _} =
         Tasks.submit_user_message(scope, task_id, user_content("Hello"), [], agent: agent)
 
-      assert_receive {:swarm_event, {:failed, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :failed}}, 5_000
 
       :sys.get_state(socket.channel_pid)
 
@@ -855,7 +899,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
           backend_tool_modules: [CrashTool]
         )
 
-      assert_receive {:swarm_event, {:completed, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :completed}}, 5_000
 
       {:ok, task} = Tasks.get_task(scope, task_id)
 
@@ -899,7 +943,7 @@ defmodule FrontmanServer.Tasks.ExecutionIntegrationTest do
         )
 
       # on_timeout: :error feeds the error back to the LLM, agent completes normally
-      assert_receive {:swarm_event, {:completed, _}}, 5_000
+      assert_receive {:execution_event, %ExecutionEvent{type: :completed}}, 5_000
 
       {:ok, task} = Tasks.get_task(scope, task_id)
 

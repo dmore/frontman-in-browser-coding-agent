@@ -19,7 +19,7 @@ defmodule FrontmanServerWeb.TaskChannel do
   alias FrontmanServer.Providers
   alias FrontmanServer.Providers.{Model, Registry}
   alias FrontmanServer.Tasks
-  alias FrontmanServer.Tasks.{Execution, RetryCoordinator, Todos}
+  alias FrontmanServer.Tasks.{Execution, ExecutionEvent, RetryCoordinator, Todos}
   alias FrontmanServer.Tools
   alias FrontmanServerWeb.ACPHistory
   alias FrontmanServerWeb.TaskChannel.MCPInitializer
@@ -406,7 +406,7 @@ defmodule FrontmanServerWeb.TaskChannel do
 
         if had_retry do
           # Was in retry countdown — no execution to cancel, end the turn now
-          finalize_turn(socket, {:completed, ACP.stop_reason_cancelled()})
+          finalize_turn(socket, {:completed, ACP.stop_reason_cancelled()}, nil)
         else
           {:noreply, socket}
         end
@@ -526,8 +526,6 @@ defmodule FrontmanServerWeb.TaskChannel do
     # Prepare tools (domain service)
     all_tools = mcp_tools |> Tools.prepare_for_task(task_id)
 
-    socket = assign(socket, :pending_prompt_id, id)
-
     opts =
       build_execution_opts(socket,
         env_api_key: env_api_key,
@@ -535,10 +533,24 @@ defmodule FrontmanServerWeb.TaskChannel do
         mcp_tool_defs: mcp_tools
       )
 
-    socket = assign(socket, :last_execution_opts, opts)
-
     case Tasks.submit_user_message(scope, task_id, prompt.content, all_tools, opts) do
-      {:ok, _interaction} ->
+      {:error, :already_running} ->
+        Logger.info("Rejected prompt — agent already running for task #{task_id}")
+        error_response = JsonRpc.error_response(id, -32_000, "Agent already running")
+        {:reply, {:ok, %{@acp_message => error_response}}, socket}
+
+      {:ok, interaction} ->
+        # Execution started — correlate this JSON-RPC request with the domain interaction
+        socket =
+          assign(socket, :pending_prompt, %{
+            interaction_id: interaction.id,
+            jsonrpc_id: id
+          })
+
+        # Store interaction_id in execution opts for retry flow
+        opts = Keyword.put(opts, :interaction_id, interaction.id)
+        socket = assign(socket, :last_execution_opts, opts)
+
         Logger.info("User message added, agent spawned for task #{task_id}")
 
         Tasks.enqueue_title_generation(scope, task_id, prompt.text_summary,
@@ -594,9 +606,9 @@ defmodule FrontmanServerWeb.TaskChannel do
     {:noreply, socket}
   end
 
-  # --- SwarmAi events (dispatched via MFA → PubSub) ---
+  # --- Execution events (domain events from SwarmDispatcher via PubSub) ---
 
-  def handle_info({:swarm_event, {:chunk, chunk}}, socket) do
+  def handle_info({:execution_event, %ExecutionEvent{type: :chunk, payload: chunk}}, socket) do
     task_id = socket.assigns.task_id
 
     socket =
@@ -632,25 +644,22 @@ defmodule FrontmanServerWeb.TaskChannel do
     {:noreply, socket}
   end
 
-  def handle_info({:swarm_event, event}, socket) do
-    scope = socket.assigns.scope
-    task_id = socket.assigns.task_id
-
-    case Execution.handle_swarm_event(scope, task_id, event) do
+  def handle_info({:execution_event, %ExecutionEvent{} = event}, socket) do
+    case ExecutionEvent.classify(event) do
       :agent_completed ->
-        finalize_turn(socket, {:completed, ACP.stop_reason_end_turn()})
+        finalize_turn(socket, {:completed, ACP.stop_reason_end_turn()}, event.caused_by)
 
       :agent_cancelled ->
-        finalize_turn(socket, {:completed, ACP.stop_reason_cancelled()})
+        finalize_turn(socket, {:completed, ACP.stop_reason_cancelled()}, event.caused_by)
 
       :agent_paused ->
-        finalize_turn(socket, {:completed, ACP.stop_reason_end_turn()})
+        finalize_turn(socket, {:completed, ACP.stop_reason_end_turn()}, event.caused_by)
 
       {:agent_error, %{retryable: true} = error_info} ->
-        handle_transient_error(socket, error_info)
+        handle_transient_error(socket, error_info, event.caused_by)
 
       {:agent_error, %{retryable: false} = error_info} ->
-        finalize_turn(socket, {:error, error_info.message, error_info.category})
+        finalize_turn(socket, {:error, error_info.message, error_info.category}, event.caused_by)
 
       :ok ->
         {:noreply, socket}
@@ -742,7 +751,7 @@ defmodule FrontmanServerWeb.TaskChannel do
   # Agent failed to start (e.g. no API key, usage limit). Broadcast by
   # Tasks.maybe_start_execution when Execution.run returns an error.
   def handle_info({:execution_start_error, msg}, socket) do
-    finalize_turn(socket, {:error, msg, "unknown"})
+    finalize_turn(socket, {:error, msg, "unknown"}, nil)
   end
 
   def handle_info(:fire_retry, socket) do
@@ -804,10 +813,10 @@ defmodule FrontmanServerWeb.TaskChannel do
     {:noreply, socket}
   end
 
-  defp handle_transient_error(socket, error_info) do
+  defp handle_transient_error(socket, error_info, caused_by) do
     case RetryCoordinator.handle_error(socket.assigns[:retry_state], error_info) do
       {:exhausted, error_info} ->
-        finalize_turn(socket, {:error, error_info.message, error_info.category})
+        finalize_turn(socket, {:error, error_info.message, error_info.category}, caused_by)
 
       {:retry_scheduled, state, notification} ->
         task_id = socket.assigns.task_id
@@ -831,8 +840,9 @@ defmodule FrontmanServerWeb.TaskChannel do
            {:completed, stop_reason :: String.t()}
            | {:error, message :: String.t(), category :: String.t()}
 
-  @spec finalize_turn(Phoenix.Socket.t(), turn_outcome()) :: {:noreply, Phoenix.Socket.t()}
-  defp finalize_turn(socket, outcome) do
+  @spec finalize_turn(Phoenix.Socket.t(), turn_outcome(), String.t() | nil) ::
+          {:noreply, Phoenix.Socket.t()}
+  defp finalize_turn(socket, outcome, caused_by) do
     task_id = socket.assigns.task_id
     socket = assign(socket, :retry_state, RetryCoordinator.clear(socket.assigns[:retry_state]))
 
@@ -840,27 +850,34 @@ defmodule FrontmanServerWeb.TaskChannel do
       {:completed, stop_reason} ->
         notification = ACP.build_agent_turn_complete_notification(task_id, stop_reason)
         push(socket, @acp_message, notification)
-        resolve_pending_prompt(socket, {:ok, stop_reason})
+        resolve_pending_prompt(socket, {:ok, stop_reason}, caused_by)
 
       {:error, message, category} ->
         notification =
           ACP.build_error_notification(task_id, message, DateTime.utc_now(), category: category)
 
         push(socket, @acp_message, notification)
-        resolve_pending_prompt(socket, {:error, message})
+        resolve_pending_prompt(socket, {:error, message}, caused_by)
     end
   end
 
-  defp resolve_pending_prompt(socket, result) do
+  defp resolve_pending_prompt(socket, result, caused_by) do
     task_id = socket.assigns.task_id
 
     socket =
-      case socket.assigns[:pending_prompt_id] do
+      case socket.assigns[:pending_prompt] do
         nil ->
-          Logger.info("Turn finalized with no pending_prompt_id for task #{task_id}")
+          Logger.info("Turn finalized with no pending prompt for task #{task_id}")
           socket
 
-        prompt_id ->
+        %{interaction_id: interaction_id, jsonrpc_id: prompt_id} ->
+          if caused_by && caused_by != interaction_id do
+            Logger.warning(
+              "Causation mismatch resolving prompt for task #{task_id}: " <>
+                "pending interaction #{interaction_id}, event caused by #{caused_by}"
+            )
+          end
+
           response =
             case result do
               {:ok, stop_reason} ->
@@ -876,7 +893,7 @@ defmodule FrontmanServerWeb.TaskChannel do
             end
 
           push(socket, @acp_message, response)
-          assign(socket, :pending_prompt_id, nil)
+          assign(socket, :pending_prompt, nil)
       end
 
     {:noreply, socket}

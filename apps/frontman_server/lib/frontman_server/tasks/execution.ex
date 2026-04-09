@@ -27,8 +27,8 @@ defmodule FrontmanServer.Tasks.Execution do
   alias FrontmanServer.Observability.TelemetryEvents
   alias FrontmanServer.Providers
   alias FrontmanServer.Providers.{Model, Registry, ResolvedKey}
-  alias FrontmanServer.Tasks.Execution.{Framework, LLMError, RootAgent, ToolExecutor}
-  alias FrontmanServer.Tasks.{Interaction, StreamStallTimeout, Task}
+  alias FrontmanServer.Tasks.Execution.{Framework, RootAgent, ToolExecutor}
+  alias FrontmanServer.Tasks.{Interaction, Task}
   alias FrontmanServer.Tools
   alias SwarmAi.Message
 
@@ -95,7 +95,8 @@ defmodule FrontmanServer.Tasks.Execution do
         submit_to_runtime(scope, agent, task_id, messages,
           api_key_info: api_key_info,
           mcp_tool_defs: mcp_tool_defs,
-          backend_tool_modules: backend_tool_modules
+          backend_tool_modules: backend_tool_modules,
+          interaction_id: Keyword.get(opts, :interaction_id)
         )
 
       {:error, reason} ->
@@ -124,88 +125,6 @@ defmodule FrontmanServer.Tasks.Execution do
     end
   end
 
-  # --- Event Handling ---
-
-  @doc """
-  Translates a SwarmAi event to a transport-level action for the channel.
-
-  Called by the TaskChannel from `handle_info({:swarm_event, event})`.
-
-  **Persistence is handled by SwarmDispatcher** (runs in the Runtime Task
-  process). This function only determines what the channel should push to
-  the client — if the channel is dead, no data is lost.
-  """
-  @spec handle_swarm_event(Scope.t(), String.t(), term()) :: term()
-  def handle_swarm_event(_scope, _task_id, {:response, _response}), do: :ok
-
-  def handle_swarm_event(_scope, _task_id, {:completed, {:ok, _result, _loop_id}}),
-    do: :agent_completed
-
-  def handle_swarm_event(_scope, _task_id, {:failed, {:error, reason, _loop_id}}) do
-    {msg, category, retryable} = classify_error(reason)
-    {:agent_error, %{message: msg, category: category, retryable: retryable}}
-  end
-
-  def handle_swarm_event(_scope, _task_id, {:crashed, %{reason: reason}}) do
-    msg = humanize_crash(reason)
-    {:agent_error, %{message: msg, category: "unknown", retryable: false}}
-  end
-
-  def handle_swarm_event(_scope, _task_id, {:cancelled, _}),
-    do: :agent_cancelled
-
-  def handle_swarm_event(_scope, _task_id, {:terminated, _}),
-    do: :agent_cancelled
-
-  # Paused — ToolResult and AgentPaused already persisted by SwarmDispatcher.
-  # Return :agent_paused so the channel can resolve the pending prompt and notify the client.
-  def handle_swarm_event(_scope, _task_id, {:paused, _}), do: :agent_paused
-
-  # Tool calls are persisted by ToolExecutor; no channel action needed.
-  def handle_swarm_event(_scope, _task_id, {:tool_call, _}), do: :ok
-
-  @doc """
-  Classifies an error reason into `{message, category, retryable}`.
-
-  `category` is one of: "auth", "billing", "rate_limit", "overload",
-  "payload_too_large", "output_truncated", "unknown".
-  """
-  @spec classify_error(term()) :: {String.t(), String.t(), boolean()}
-  def classify_error(%LLMError{message: msg, category: cat, retryable: r}), do: {msg, cat, r}
-
-  def classify_error(%StreamStallTimeout.Error{}) do
-    {"The AI provider stopped responding mid-reply. " <>
-       "This usually happens when the provider is temporarily overloaded. " <>
-       "Try sending your message again.", "overload", true}
-  end
-
-  def classify_error(:genserver_call_timeout) do
-    {"The request to the AI provider timed out. " <>
-       "This can happen during high traffic. Try again in a moment.", "overload", true}
-  end
-
-  def classify_error(:stream_timeout) do
-    {"The request to the AI provider timed out. " <>
-       "This can happen during high traffic. Try again in a moment.", "overload", true}
-  end
-
-  def classify_error(:output_truncated) do
-    {"The AI response was too long and got cut off. " <>
-       "This usually happens when writing large files. " <>
-       "Try asking the AI to write the file in smaller sections.", "output_truncated", false}
-  end
-
-  def classify_error({:exit, reason}) do
-    {"Something went wrong while communicating with the AI provider: #{inspect(reason)}",
-     "unknown", false}
-  end
-
-  def classify_error(reason) when is_exception(reason),
-    do: {Exception.message(reason), "unknown", false}
-
-  def classify_error(reason) when is_binary(reason), do: {reason, "unknown", false}
-  def classify_error(reason), do: {inspect(reason), "unknown", false}
-
   # --- Private ---
 
   # Dialyzer warning suppressed: protocol dispatch on Agent can't be statically proven.
@@ -233,8 +152,15 @@ defmodule FrontmanServer.Tasks.Execution do
     # in event handlers — the agent may complete before this line returns.
     TelemetryEvents.task_start(task_id)
 
+    interaction_id = Keyword.get(opts, :interaction_id)
+
     case SwarmAi.Runtime.run(FrontmanServer.AgentRuntime, task_id, agent, messages,
-           metadata: %{task_id: task_id, resolved_key: resolved_key, scope: scope},
+           metadata: %{
+             task_id: task_id,
+             resolved_key: resolved_key,
+             scope: scope,
+             interaction_id: interaction_id
+           },
            tool_executor: tool_executor
          ) do
       {:ok, pid} ->
@@ -418,16 +344,4 @@ defmodule FrontmanServer.Tasks.Execution do
 
   def error_message(%Scope{}, reason),
     do: inspect(reason)
-
-  # Translates internal error reasons into user-friendly messages.
-  # Delegates to classify_error/1 to keep message strings in one place.
-  defp humanize_error(reason) do
-    {message, _category, _retryable} = classify_error(reason)
-    message
-  end
-
-  # Like humanize_error, but prefixes unknown/fallback reasons with crash context.
-  defp humanize_crash(reason) when is_exception(reason), do: humanize_error(reason)
-  defp humanize_crash(reason) when is_atom(reason), do: "Execution crashed: #{inspect(reason)}"
-  defp humanize_crash(reason), do: "Execution crashed: #{humanize_error(reason)}"
 end
