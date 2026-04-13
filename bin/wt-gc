@@ -28,7 +28,7 @@ BOLD='\033[1m'
 RESET='\033[0m'
 
 # ── Resolve main repo root (works from any worktree) ────
-MAIN_REPO=$(git worktree list --porcelain | head -1 | sed 's/^worktree //')
+MAIN_REPO=$(git worktree list --porcelain | { IFS= read -r line; echo "${line#worktree }"; })
 WORKTREES_DIR="${MAIN_REPO}/.worktrees"
 
 # Portable MD5 (same logic as Makefile / dashboard)
