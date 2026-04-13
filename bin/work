@@ -135,6 +135,8 @@ ensure_pod() {
   local hash
   hash=$(md5_short "$BRANCH")
   local pod_name="worktree-${hash}"
+  local wt_dir
+  wt_dir="$(pwd)/.worktrees/${BRANCH}"
 
   local pod_status
   pod_status=$(podman pod inspect "$pod_name" --format '{{.State}}' 2>/dev/null || echo "missing")
@@ -142,9 +144,18 @@ ensure_pod() {
   case "$pod_status" in
     Running)
       printf "${GREEN}Pod %s is already running.${RESET}\n" "$pod_name"
+      # Pod exists but worktree dir may have been removed — recreate it
+      if [ ! -d "$wt_dir" ]; then
+        printf "${YELLOW}Worktree dir missing. Recreating git worktree...${RESET}\n"
+        make worktree-create BRANCH="$BRANCH"
+      fi
       ;;
     Exited|Stopped|Created)
       printf "${YELLOW}Pod %s is stopped. Resuming...${RESET}\n" "$pod_name"
+      if [ ! -d "$wt_dir" ]; then
+        printf "${YELLOW}Worktree dir missing. Recreating git worktree...${RESET}\n"
+        make worktree-create BRANCH="$BRANCH"
+      fi
       make wt-start BRANCH="$BRANCH"
       ;;
     missing)
@@ -153,6 +164,10 @@ ensure_pod() {
       ;;
     *)
       printf "${YELLOW}Pod %s in state '%s'. Attempting start...${RESET}\n" "$pod_name" "$pod_status"
+      if [ ! -d "$wt_dir" ]; then
+        printf "${YELLOW}Worktree dir missing. Recreating git worktree...${RESET}\n"
+        make worktree-create BRANCH="$BRANCH"
+      fi
       make wt-start BRANCH="$BRANCH"
       ;;
   esac
