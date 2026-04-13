@@ -195,6 +195,9 @@ export default defineConfig({
       // Exclude tag pages — thin filtered lists that add sitemap bloat
       // without meaningful indexable content.
       if (/\/blog\/tags\//.test(item.url)) return undefined;
+      // Exclude integration redirect pages — they 301 to /docs/integrations/*,
+      // which are already in the sitemap.
+      if (/(?<!\/docs)\/integrations\/(astro|nextjs|vite)\/?$/.test(item.url)) return undefined;
 
       // Use the real pubDate for blog and release posts; fall back to
       // build date for everything else.
