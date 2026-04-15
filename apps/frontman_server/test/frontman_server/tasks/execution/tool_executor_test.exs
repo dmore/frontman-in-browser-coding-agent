@@ -58,7 +58,7 @@ defmodule FrontmanServer.Tasks.Execution.ToolExecutorTest do
 
     scope = Scope.for_user(user)
     task_id = Ecto.UUID.generate()
-    {:ok, ^task_id} = Tasks.create_task(scope, task_id)
+    {:ok, ^task_id} = Tasks.create_task(scope, task_id, "test-framework")
 
     llm_opts = [api_key: "test-key", model: "openrouter:anthropic/claude-sonnet-4-20250514"]
 
