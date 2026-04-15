@@ -123,44 +123,38 @@ let addLog = (
   }
 }
 
-let handleConsoleLog = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=Log)
-  } catch {
-  | _ => ()
+let detectLevel = (state: state, message: string): logLevel => {
+  let matchesBuildPattern =
+    state.config.stdoutPatterns->Array.some(pattern => message->String.includes(pattern))
+  switch matchesBuildPattern {
+  | true => Build
+  | false => Console
   }
+}
+
+let handleConsoleLog = (state: state, args: array<'a>): unit => {
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=Log)
 }
 
 let handleConsoleWarn = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=Warn)
-  } catch {
-  | _ => ()
-  }
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=Warn)
 }
 
 let handleConsoleError = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=ConsoleError)
-  } catch {
-  | _ => ()
-  }
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=ConsoleError)
 }
 
 let handleConsoleInfo = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=Info)
-  } catch {
-  | _ => ()
-  }
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=Info)
 }
 
 let handleConsoleDebug = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=Debug)
-  } catch {
-  | _ => ()
-  }
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=Debug)
 }
 
 // Variadic interceptConsole implemented in raw JavaScript to fix variadic arguments bug
@@ -172,49 +166,26 @@ let interceptConsole: state => unit = %raw(`(function(state) {
   const originalDebug = console.debug.bind(console);
 
   console.log = (...args) => {
-    handleConsoleLog(state, args);
     originalLog(...args);
+    handleConsoleLog(state, args);
   };
   console.warn = (...args) => {
-    handleConsoleWarn(state, args);
     originalWarn(...args);
+    handleConsoleWarn(state, args);
   };
   console.error = (...args) => {
-    handleConsoleError(state, args);
     originalError(...args);
+    handleConsoleError(state, args);
   };
   console.info = (...args) => {
-    handleConsoleInfo(state, args);
     originalInfo(...args);
+    handleConsoleInfo(state, args);
   };
   console.debug = (...args) => {
-    handleConsoleDebug(state, args);
     originalDebug(...args);
+    handleConsoleDebug(state, args);
   };
 })`)
-
-let handleStdoutWrite = (state: state, message: string): unit => {
-  try {
-    let matchesPattern =
-      state.config.stdoutPatterns->Array.some(pattern => message->String.includes(pattern))
-    if matchesPattern {
-      addLog(state, Build, message)
-    }
-  } catch {
-  | _ => ()
-  }
-}
-
-let interceptStdout = (_state: state): unit => {
-  %raw(`(function(_state) {
-    const originalWrite = process.stdout.write.bind(process.stdout);
-    process.stdout.write = (chunk, ...args) => {
-      const message = typeof chunk === 'string' ? chunk : chunk.toString();
-      handleStdoutWrite(_state, message);
-      return originalWrite(chunk, ...args);
-    };
-  })(_state)`)
-}
 
 // Temporary inline bindings until workspace linking is fixed
 type processError = {
@@ -278,7 +249,6 @@ let initialize = (~config: config=defaultConfig, ()): unit => {
         setPatchedFlag(true)
         let state = getOrCreateInstance(~config)
         interceptConsole(state)
-        interceptStdout(state)
         interceptUncaughtErrors(state)
       }
     }

@@ -68,6 +68,7 @@ let defaultConfig: config = {
 type state = {
   buffer: ref<CircularBuffer.t<logEntry>>,
   config: config,
+  insideConsoleHandler: ref<bool>,
 }
 
 let getGlobalInstanceOpt = (): option<state> => %raw(`globalThis.__FRONTMAN_CORE_INSTANCE__`)
@@ -81,6 +82,7 @@ let getOrCreateInstance = (~config: config): state => {
     let state = {
       buffer: ref(CircularBuffer.make(~capacity=config.bufferCapacity)),
       config,
+      insideConsoleHandler: ref(false),
     }
     setGlobalInstance(state)
     state
@@ -140,44 +142,38 @@ let addLog = (
   }
 }
 
-let handleConsoleLog = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=Log)
-  } catch {
-  | _ => ()
+let detectLevel = (state: state, message: string): logLevel => {
+  let matchesBuildPattern =
+    state.config.stdoutPatterns->Array.some(pattern => message->String.includes(pattern))
+  switch matchesBuildPattern {
+  | true => Build
+  | false => Console
   }
+}
+
+let handleConsoleLog = (state: state, args: array<'a>): unit => {
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=Log)
 }
 
 let handleConsoleWarn = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=Warn)
-  } catch {
-  | _ => ()
-  }
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=Warn)
 }
 
 let handleConsoleError = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=ConsoleError)
-  } catch {
-  | _ => ()
-  }
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=ConsoleError)
 }
 
 let handleConsoleInfo = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=Info)
-  } catch {
-  | _ => ()
-  }
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=Info)
 }
 
 let handleConsoleDebug = (state: state, args: array<'a>): unit => {
-  try {
-    addLog(state, Console, argsToString(args), ~consoleMethod=Debug)
-  } catch {
-  | _ => ()
-  }
+  let message = argsToString(args)
+  addLog(state, detectLevel(state, message), message, ~consoleMethod=Debug)
 }
 
 // Variadic interceptConsole implemented in raw JavaScript to handle variadic arguments
@@ -189,37 +185,42 @@ let interceptConsole: state => unit = %raw(`(function(state) {
   const originalDebug = console.debug.bind(console);
 
   console.log = (...args) => {
+    state.insideConsoleHandler.contents = true;
+    try { originalLog(...args); } finally { state.insideConsoleHandler.contents = false; }
     handleConsoleLog(state, args);
-    originalLog(...args);
   };
   console.warn = (...args) => {
+    state.insideConsoleHandler.contents = true;
+    try { originalWarn(...args); } finally { state.insideConsoleHandler.contents = false; }
     handleConsoleWarn(state, args);
-    originalWarn(...args);
   };
   console.error = (...args) => {
+    state.insideConsoleHandler.contents = true;
+    try { originalError(...args); } finally { state.insideConsoleHandler.contents = false; }
     handleConsoleError(state, args);
-    originalError(...args);
   };
   console.info = (...args) => {
+    state.insideConsoleHandler.contents = true;
+    try { originalInfo(...args); } finally { state.insideConsoleHandler.contents = false; }
     handleConsoleInfo(state, args);
-    originalInfo(...args);
   };
   console.debug = (...args) => {
+    state.insideConsoleHandler.contents = true;
+    try { originalDebug(...args); } finally { state.insideConsoleHandler.contents = false; }
     handleConsoleDebug(state, args);
-    originalDebug(...args);
   };
 })`)
 
 let handleStdoutWrite = (state: state, message: string): unit => {
-  try {
+  switch state.insideConsoleHandler.contents {
+  | true => ()
+  | false =>
     let matchesPattern =
       state.config.stdoutPatterns->Array.some(pattern => message->String.includes(pattern))
     switch matchesPattern {
     | true => addLog(state, Build, message)
     | false => ()
     }
-  } catch {
-  | _ => ()
   }
 }
 
@@ -230,7 +231,12 @@ let interceptStdout = (_state: state): unit => {
       stream.write = (chunk, ...args) => {
         const message = typeof chunk === 'string' ? chunk : chunk.toString();
         handleStdoutWrite(_state, message);
-        return originalWrite(chunk, ...args);
+        try {
+          return originalWrite(chunk, ...args);
+        } catch (e) {
+          if (e && e.code === 'EPIPE') return false;
+          throw e;
+        }
       };
     };
     interceptStream(process.stdout);
