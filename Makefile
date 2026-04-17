@@ -455,7 +455,7 @@ test-wordpress-core-tools: ## Run PHP tests for WordPress core tool implementati
 # Utilities
 # ============================================================================
 ## UTIL_START
-.PHONY: kill-all-processes pull-webapi debug-task pr-summary push
+.PHONY: kill-all-processes pull-webapi debug-task push
 
 kill-all-processes: ## Kill all running make dev processes
 	@ps aux | grep "[m]ake dev" | awk '{print $$2}' | xargs -r kill 2>/dev/null || true
@@ -466,38 +466,7 @@ pull-webapi: ## Pull latest experimental-rescript-webapi subtree
 debug-task: ## Debug task interactions (ARGS="list" or ARGS="show ...")
 	cd apps/frontman_server && $(MAKE) debug-task ARGS="$(ARGS)"
 
-# AGD render-summary script lives in the AGD repo
-AGD_RENDER_SUMMARY := $(HOME)/dev/agd/scripts/render-summary.py
-
-pr-summary: ## Post AGD usage summary as a comment on the current branch's PR
-	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$BRANCH" = "HEAD" ] || [ "$$BRANCH" = "main" ]; then \
-		printf "$(YELLOW)Error: must be on a feature branch (current: $$BRANCH)$(RESET)\n"; \
-		exit 1; \
-	fi; \
-	PR=$$(gh pr view --json number -q .number 2>/dev/null); \
-	if [ -z "$$PR" ]; then \
-		printf "$(YELLOW)Error: no open PR found for branch '$$BRANCH'$(RESET)\n"; \
-		exit 1; \
-	fi; \
-	BODY=$$(agd log --branch "$$BRANCH" --format json 2>/dev/null | python3 $(AGD_RENDER_SUMMARY)); \
-	if [ -z "$$BODY" ]; then \
-		printf "$(CYAN)No AGD traces found for branch '$$BRANCH'$(RESET)\n"; \
-		exit 0; \
-	fi; \
-	REPO=$$(gh repo view --json nameWithOwner -q .nameWithOwner); \
-	MARKER="<!-- agd-summary -->"; \
-	EXISTING=$$(gh api "repos/$$REPO/issues/$$PR/comments" --paginate -q ".[] | select(.body | startswith(\"$$MARKER\")) | .id" 2>/dev/null | head -1); \
-	if [ -n "$$EXISTING" ]; then \
-		echo "$$BODY" | gh api "repos/$$REPO/issues/comments/$$EXISTING" -X PATCH --field "body=@-" > /dev/null; \
-		printf "$(GREEN)Updated AGD summary on PR #$$PR$(RESET)\n"; \
-	else \
-		echo "$$BODY" | gh api "repos/$$REPO/issues/$$PR/comments" -X POST --field "body=@-" > /dev/null; \
-		printf "$(GREEN)Posted AGD summary on PR #$$PR$(RESET)\n"; \
-	fi
-
-push: ## Git push + auto-update PR summary with AGD stats
+push: ## Git push current branch
 	@git push
-	@$(MAKE) --no-print-directory pr-summary
 
 ## UTIL_END
