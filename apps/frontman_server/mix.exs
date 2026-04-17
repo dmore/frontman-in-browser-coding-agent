@@ -7,6 +7,7 @@ defmodule FrontmanServer.MixProject do
       version: "0.0.1",
       elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
+      elixirc_options: [warnings_as_errors: true],
       start_permanent: Mix.env() == :prod,
       consolidate_protocols: Mix.env() != :test,
       deps: deps(),
