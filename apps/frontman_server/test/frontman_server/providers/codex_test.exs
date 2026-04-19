@@ -33,7 +33,10 @@ defmodule FrontmanServer.Providers.CodexTest do
         Codex.patch_llm_opts(opts, "https://chatgpt.com/backend-api/codex/responses", "acc-456")
 
       assert Keyword.get(result, :base_url) == "https://chatgpt.com/backend-api/codex"
-      assert Keyword.get(result, :extra_headers) == [{"ChatGPT-Account-Id", "acc-456"}]
+
+      assert Keyword.get(result, :req_http_options) ==
+               [headers: [{"ChatGPT-Account-Id", "acc-456"}]]
+
       refute Keyword.has_key?(result, :max_tokens)
       assert Keyword.get(result, :provider_options) == [store: false]
       assert Keyword.get(result, :api_key) == "sk-123"
@@ -44,6 +47,16 @@ defmodule FrontmanServer.Providers.CodexTest do
       result = Codex.patch_llm_opts(opts, "https://example.com/responses", nil)
 
       assert Keyword.get(result, :provider_options) == [store: false, other: true]
+    end
+
+    test "overwrites existing req_http_options when account header is present" do
+      opts = [req_http_options: [headers: [{"X-Trace-Id", "trace-1"}], receive_timeout: 1_000]]
+
+      result = Codex.patch_llm_opts(opts, "https://example.com/responses", "acc-999")
+
+      assert Keyword.get(result, :req_http_options) == [
+               headers: [{"ChatGPT-Account-Id", "acc-999"}]
+             ]
     end
   end
 end
