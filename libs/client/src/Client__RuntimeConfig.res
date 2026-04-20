@@ -44,6 +44,7 @@ type parsed = {
   wpNonce: option<string>,
   openrouterKeyValue: option<string>,
   anthropicKeyValue: option<string>,
+  fireworksKeyValue: option<string>,
   projectRoot: option<string>,
   sourceRoot: option<string>,
 }
@@ -54,9 +55,16 @@ type t = {
   wpNonce: option<string>,
   openrouterKeyValue: option<string>,
   anthropicKeyValue: option<string>,
+  fireworksKeyValue: option<string>,
   projectRoot: option<string>,
   sourceRoot: option<string>,
 }
+
+let normalizeOptionalString = value =>
+  switch value {
+  | Some("") | None => None
+  | Some(text) => Some(text)
+  }
 
 let read = (): t => {
   let getRuntime: unit => Nullable.t<JSON.t> = %raw(`
@@ -74,11 +82,26 @@ let read = (): t => {
     | Some(bp) => bp
     },
     wpNonce: config.wpNonce,
-    openrouterKeyValue: config.openrouterKeyValue,
-    anthropicKeyValue: config.anthropicKeyValue,
+    openrouterKeyValue: normalizeOptionalString(config.openrouterKeyValue),
+    anthropicKeyValue: normalizeOptionalString(config.anthropicKeyValue),
+    fireworksKeyValue: normalizeOptionalString(config.fireworksKeyValue),
     projectRoot: config.projectRoot,
     sourceRoot: config.sourceRoot,
   }
+}
+
+let toEnvApiKeyDict = (config: t): Dict.t<string> => {
+  let envApiKey = Dict.make()
+  config.openrouterKeyValue->Option.forEach(key => {
+    envApiKey->Dict.set("openrouterKeyValue", key)
+  })
+  config.anthropicKeyValue->Option.forEach(key => {
+    envApiKey->Dict.set("anthropicKeyValue", key)
+  })
+  config.fireworksKeyValue->Option.forEach(key => {
+    envApiKey->Dict.set("fireworksKeyValue", key)
+  })
+  envApiKey
 }
 
 // Check if an OpenRouter API key is available from the project environment
@@ -89,6 +112,15 @@ let hasOpenrouterKey = (config: t): bool => {
 // Check if an Anthropic API key is available from the project environment
 let hasAnthropicKey = (config: t): bool => {
   config.anthropicKeyValue->Option.isSome
+}
+
+// Check if a Fireworks API key is available from the project environment
+let hasFireworksKey = (config: t): bool => {
+  config.fireworksKeyValue->Option.isSome
+}
+
+let hasAnyProviderKey = (config: t): bool => {
+  toEnvApiKeyDict(config)->Dict.valuesToArray->Array.length > 0
 }
 
 // Model update checks explicitly so WordPress doesn't silently pretend to have
@@ -102,18 +134,15 @@ let frameworkUpdateTarget = (id: frameworkId): updateTarget =>
   }
 
 // Convert runtime config to _meta JSON for ACP requests
-// Includes framework and openrouterKeyValue so the server knows
-// which framework the client is running in and can use the project's env key
+// Includes framework and forwarded provider keys so the server knows
+// which framework the client is running in and can use the project's env keys
 let toMeta = (config: t): JSON.t => {
   let configObj = Dict.fromArray([
     ("framework", JSON.Encode.string(frameworkIdToString(config.framework))),
     ("basePath", JSON.Encode.string(config.basePath)),
   ])
-  config.openrouterKeyValue->Option.forEach(key => {
-    configObj->Dict.set("openrouterKeyValue", JSON.Encode.string(key))
-  })
-  config.anthropicKeyValue->Option.forEach(key => {
-    configObj->Dict.set("anthropicKeyValue", JSON.Encode.string(key))
+  toEnvApiKeyDict(config)->Dict.forEachWithKey((keyValue, keyName) => {
+    configObj->Dict.set(keyName, JSON.Encode.string(keyValue))
   })
   JSON.Encode.object(configObj)
 }

@@ -20,16 +20,28 @@ defmodule FrontmanServer.Providers.ModelCatalogTest do
     test "returns empty list for unknown provider" do
       assert ModelCatalog.models("unknown-provider", :full) == []
     end
+
+    test "returns Fireworks models for full and free tiers" do
+      expected = [
+        %{displayName: "Kimi K2.5 Turbo", value: "accounts/fireworks/routers/kimi-k2p5-turbo"}
+      ]
+
+      assert ModelCatalog.models("fireworks", :full) == expected
+      assert ModelCatalog.models("fireworks", :free) == expected
+    end
   end
 
   describe "catalog_providers/0" do
-    test "openai comes before anthropic comes before openrouter" do
+    test "providers are ordered by configured priority" do
       providers = ModelCatalog.catalog_providers()
-      openai_idx = Enum.find_index(providers, &(&1 == "openai"))
-      anthropic_idx = Enum.find_index(providers, &(&1 == "anthropic"))
-      openrouter_idx = Enum.find_index(providers, &(&1 == "openrouter"))
-      assert openai_idx < anthropic_idx
-      assert anthropic_idx < openrouter_idx
+
+      assert Enum.filter(providers, &(&1 in ["openai", "anthropic", "openrouter", "fireworks"])) ==
+               [
+                 "openai",
+                 "anthropic",
+                 "openrouter",
+                 "fireworks"
+               ]
     end
   end
 
@@ -42,6 +54,12 @@ defmodule FrontmanServer.Providers.ModelCatalogTest do
     test "picks anthropic when openai not available" do
       default = ModelCatalog.pick_default(["anthropic", "openrouter"])
       assert default.provider == "anthropic"
+    end
+
+    test "picks fireworks when it is the only available provider" do
+      default = ModelCatalog.pick_default(["fireworks"])
+      assert default.provider == "fireworks"
+      assert default.value == "accounts/fireworks/routers/kimi-k2p5-turbo"
     end
 
     test "falls back to openrouter for empty list" do

@@ -68,6 +68,12 @@ type usageInfo = {
   hasServerKey: option<bool>,
 }
 
+@schema
+type userApiKeySaveRequest = {
+  provider: string,
+  key: string,
+}
+
 // API key source status for settings display
 type apiKeySource =
   | None // No key configured
@@ -151,6 +157,7 @@ type state = {
   userProfile: option<userProfile>,
   openrouterKeySettings: apiKeySettings,
   anthropicKeySettings: apiKeySettings,
+  fireworksKeySettings: apiKeySettings,
   anthropicOAuthStatus: anthropicOAuthStatus,
   chatgptOAuthStatus: chatgptOAuthStatus,
   // ACP session config options (replaces bespoke modelsConfig/selectedModel).

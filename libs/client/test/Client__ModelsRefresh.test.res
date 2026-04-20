@@ -23,6 +23,7 @@ let _makeState = (
   ~anthropicOAuthStatus=Types.NotConnected,
   ~chatgptOAuthStatus=Types.ChatGPTNotConnected,
   ~openrouterKeySettings={Types.source: Types.None, saveStatus: Types.Idle},
+  ~fireworksKeySettings={Types.source: Types.None, saveStatus: Types.Idle},
   ~selectedModelValue=None,
   ~pendingProviderAutoSelect=None,
 ): Types.state => {
@@ -45,6 +46,7 @@ let _makeState = (
       source: Types.None,
       saveStatus: Types.Idle,
     },
+    fireworksKeySettings,
     anthropicOAuthStatus,
     chatgptOAuthStatus,
     configOptions: None,
@@ -128,6 +130,20 @@ module SampleConfig = {
     _meta: None,
   }
 
+  let _fireworksGroup: ACP.sessionConfigSelectGroup = {
+    group: "fireworks",
+    name: "Fireworks AI",
+    options: [
+      {
+        value: "fireworks:accounts/fireworks/routers/kimi-k2p5-turbo",
+        name: "Kimi K2.5 Turbo",
+        description: None,
+        _meta: None,
+      },
+    ],
+    _meta: None,
+  }
+
   let configWithAnthropic = [
     _makeModelConfigOption(
       ~groups=[_anthropicGroup, _openrouterGroup],
@@ -146,6 +162,13 @@ module SampleConfig = {
     _makeModelConfigOption(
       ~groups=[_openrouterGroup],
       ~currentValue="openrouter:google/gemini-3-flash-preview",
+    ),
+  ]
+
+  let configWithFireworksOnly = [
+    _makeModelConfigOption(
+      ~groups=[_fireworksGroup],
+      ~currentValue="fireworks:accounts/fireworks/routers/kimi-k2p5-turbo",
     ),
   ]
 }
@@ -184,6 +207,14 @@ describe("Initiating actions set pendingProviderAutoSelect eagerly", () => {
     let (nextState, _effects) = Reducer.next(state, SaveAnthropicKey({key: "test-key"}))
 
     t->expect(nextState.pendingProviderAutoSelect)->Expect.toEqual(Some("anthropic"))
+  })
+
+  test("SaveFireworksKey sets pendingProviderAutoSelect to fireworks", t => {
+    let state = _makeState()
+
+    let (nextState, _effects) = Reducer.next(state, SaveFireworksKey({key: "test-key"}))
+
+    t->expect(nextState.pendingProviderAutoSelect)->Expect.toEqual(Some("fireworks"))
   })
 })
 
@@ -239,7 +270,24 @@ describe("ConfigOptionsReceived auto-selects model from newly connected provider
     t->expect(nextState.pendingProviderAutoSelect)->Expect.toEqual(None)
   })
 
-  test("keeps current selection when no pending provider auto-select", t => {
+  test("auto-selects Fireworks model when pendingProviderAutoSelect is fireworks", t => {
+    let state = _makeState(
+      ~pendingProviderAutoSelect=Some("fireworks"),
+      ~selectedModelValue=Some("openrouter:anthropic/claude-haiku-4.5"),
+    )
+
+    let (nextState, _effects) = Reducer.next(
+      state,
+      ConfigOptionsReceived({configOptions: SampleConfig.configWithFireworksOnly}),
+    )
+
+    t
+    ->expect(nextState.selectedModelValue)
+    ->Expect.toEqual(Some("fireworks:accounts/fireworks/routers/kimi-k2p5-turbo"))
+    t->expect(nextState.pendingProviderAutoSelect)->Expect.toEqual(None)
+  })
+
+  test("keeps the current selection even when refreshed config omits it", t => {
     let existingModel = "openrouter:google/gemini-3-flash-preview"
     let state = _makeState(~selectedModelValue=Some(existingModel))
 
@@ -265,14 +313,13 @@ describe("ConfigOptionsReceived auto-selects model from newly connected provider
     ->Expect.toEqual(Some("anthropic:claude-sonnet-4-5"))
   })
 
-  test("clears pendingProviderAutoSelect even if provider not in config", t => {
-    let existingModel = "openrouter:google/gemini-3-flash-preview"
+  test("clears pendingProviderAutoSelect even when provider and current model are missing", t => {
+    let existingModel = "openai:gpt-5.1-codex-max"
     let state = _makeState(
       ~pendingProviderAutoSelect=Some("openai"),
       ~selectedModelValue=Some(existingModel),
     )
 
-    // Config doesn't have OpenAI provider — keep existing selection
     let (nextState, _effects) = Reducer.next(
       state,
       ConfigOptionsReceived({configOptions: SampleConfig.configWithOpenRouterOnly}),
