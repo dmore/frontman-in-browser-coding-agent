@@ -1,0 +1,280 @@
+---
+import Layout from '../../layouts/Layout.astro'
+import UseCaseFaqSection from '../../components/use-cases/UseCaseFaqSection.astro'
+import UseCaseCtaSection from '../../components/use-cases/UseCaseCtaSection.astro'
+
+const SEO = {
+	title: 'AI Code Editor for Designers: Edit UI Without an IDE',
+	description:
+		'Frontman is an AI code editor for designers. Click elements in your running app, describe UI changes in plain English, and generate real source code edits with hot reload.'
+}
+
+const faqs = [
+	{
+		question: 'Can designers use Frontman without writing code?',
+		answer:
+			'Yes. Designers can click an element in the running app, describe the change in plain English, and review the updated UI instantly. Frontman writes source code edits behind the scenes, and engineering reviews changes in the normal PR flow.'
+	},
+	{
+		question: 'Is Frontman a replacement for Figma?',
+		answer:
+			'No. Figma remains the best place for exploration and early concepts. Frontman is for production UI changes in a real app. Teams use both: Figma for design exploration, Frontman for shipping visual refinements in code.'
+	},
+	{
+		question: 'Will this break our design system?',
+		answer:
+			'Frontman is designed to reuse your existing components, tokens, and conventions. It works from runtime context plus source files, so changes are applied in your actual component layer instead of one-off visual overrides.'
+	},
+	{
+		question: 'Do designers need IDE or terminal access?',
+		answer:
+			'No IDE is required for day-to-day usage. A developer installs Frontman once into the project. After setup, designers and PMs can work from the browser on the running app.'
+	},
+	{
+		question: 'Which frameworks are supported for designer workflows?',
+		answer:
+			'Frontman supports Next.js, Astro, and Vite projects (React, Vue, Svelte). If your product runs on one of these stacks, designers can use the same click-to-edit workflow directly in the browser.'
+	}
+]
+
+const faqJsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'FAQPage',
+	mainEntity: faqs.map((faq) => ({
+		'@type': 'Question',
+		name: faq.question,
+		acceptedAnswer: {
+			'@type': 'Answer',
+			text: faq.answer
+		}
+	}))
+}
+
+const comparisonRows = [
+	{
+		tool: 'Frontman',
+		bestFor: 'Editing existing production UI with live context',
+		existingApp: 'Yes',
+		sourceEdits: 'Yes',
+		ideRequired: 'No',
+		notes: 'Browser workflow, framework-aware, BYOK, open source core'
+	},
+	{
+		tool: 'Figma Dev Mode',
+		bestFor: 'Design handoff and specs',
+		existingApp: 'Partial',
+		sourceEdits: 'No',
+		ideRequired: 'No',
+		notes: 'Great for inspection, still requires developer implementation'
+	},
+	{
+		tool: 'Locofy',
+		bestFor: 'Converting design artifacts to starter code',
+		existingApp: 'Partial',
+		sourceEdits: 'Partial',
+		ideRequired: 'Usually',
+		notes: 'Useful for generation, less suited for targeted production fixes'
+	},
+	{
+		tool: 'Anima',
+		bestFor: 'Prototype export and handoff acceleration',
+		existingApp: 'Partial',
+		sourceEdits: 'No',
+		ideRequired: 'No',
+		notes: 'Output still needs integration into real codebase'
+	}
+]
+
+const textLinkClass =
+	'text-primary-500 underline underline-offset-2 transition-colors hover:text-primary-400'
+const proseBulletBaseClass =
+	'relative py-2 pl-[22px] text-[17px] leading-[1.6] before:absolute before:left-0 before:top-[17px] before:h-2 before:w-2 before:rounded-full before:bg-primary-500'
+const tableHeaderClass =
+	'border-b border-zinc-800 bg-[#111113] px-[14px] py-3 text-left text-[12px] uppercase tracking-[0.06em] text-zinc-300'
+const tableCellClass =
+	'border-b border-zinc-800 bg-[#09090b] px-[14px] py-3 text-left text-[14px] leading-[1.5] text-zinc-300'
+const highlightedTableCellClass = `${tableCellClass} bg-slate-900`
+const tableToolCellClass = `${tableCellClass} font-semibold text-zinc-50`
+const highlightedTableToolCellClass = `${tableToolCellClass} bg-slate-900`
+---
+
+<Layout title={SEO.title} description={SEO.description}>
+	<script is:inline type="application/ld+json" set:html={JSON.stringify(faqJsonLd)} />
+
+	<section class="flex justify-center bg-[#09090b] px-5 pb-9 pt-12 text-zinc-50 md:px-6 md:pb-12 md:pt-20">
+		<div class="w-full max-w-[760px]">
+			<p class="mb-3 font-mono text-[13px] uppercase tracking-[0.12em] text-primary-500">Use Case</p>
+			<h1 class="mb-[14px] text-[34px] font-bold leading-[1.1] tracking-[-0.02em] text-zinc-50 md:text-[48px]">
+				AI Code Editor for Designers
+			</h1>
+			<p class="mb-[18px] text-[18px] leading-[1.5] text-zinc-300 md:text-[20px]">
+				Frontman is an AI code editor for designers: click elements in your running app,
+				describe changes in plain English, and get source code edits with hot reload.
+			</p>
+			<p class="text-[17px] leading-[1.7] text-zinc-300">
+				<a href="https://frontman.sh" class={textLinkClass}>Frontman</a> is a vertically integrated
+				AI agent that lives inside your framework and is accessible from the browser. Instead of
+				screenshots, tickets, and waiting for a sprint slot, designers can iterate directly on
+				the live app while engineering keeps normal review control.
+			</p>
+		</div>
+	</section>
+
+	<section class="flex justify-center bg-[#09090b] px-5 py-16 text-zinc-50 md:px-6">
+		<div class="w-full max-w-[760px]">
+			<h2 class="mb-5 text-[26px] font-bold tracking-[-0.02em] text-zinc-50 md:text-[32px]">
+				Why designers get blocked
+			</h2>
+			<div>
+				<p class="mb-4 text-[17px] leading-[1.7] text-zinc-300">
+					The problem is not spotting visual issues. The problem is shipping them. Designers see spacing,
+					copy, and hierarchy issues immediately, but fixing them often means screenshots, annotations,
+					tickets, and backlog negotiations.
+				</p>
+				<p class="mb-4 text-[17px] leading-[1.7] text-zinc-300">
+					That handoff loop slows down design quality and product velocity. Frontman removes the loop for
+					visual frontend work by letting designers work on the real running application.
+				</p>
+				<ul class="my-3 list-none p-0">
+					<li class={`${proseBulletBaseClass} text-zinc-300`}>
+						<strong>No IDE required</strong> for routine visual refinements.
+					</li>
+					<li class={`${proseBulletBaseClass} text-zinc-300`}>
+						<strong>No guessing</strong> from static mocks: edits happen on real layouts and real data.
+					</li>
+					<li class={`${proseBulletBaseClass} text-zinc-300`}>
+						<strong>No process rewrite</strong>: code still goes through the existing PR workflow.
+					</li>
+				</ul>
+			</div>
+		</div>
+	</section>
+
+	<section class="flex justify-center bg-zinc-50 px-5 py-16 text-[#09090b] md:px-6">
+		<div class="w-full max-w-[760px]">
+			<h2 class="mb-5 text-[26px] font-bold tracking-[-0.02em] text-[#09090b] md:text-[32px]">
+				How designers use Frontman
+			</h2>
+			<div class="grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
+				<div class="rounded-xl border border-zinc-200 bg-white p-[18px]">
+					<span class="mb-2.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-[13px] font-bold text-violet-700">
+						1
+					</span>
+					<h3 class="mb-2 text-[18px] text-slate-900">Open the running app</h3>
+					<p class="m-0 text-[15px] leading-[1.6] text-slate-600">
+						Navigate to the app in your browser and enter Frontman mode.
+					</p>
+				</div>
+				<div class="rounded-xl border border-zinc-200 bg-white p-[18px]">
+					<span class="mb-2.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-[13px] font-bold text-violet-700">
+						2
+					</span>
+					<h3 class="mb-2 text-[18px] text-slate-900">Click what looks wrong</h3>
+					<p class="m-0 text-[15px] leading-[1.6] text-slate-600">
+						Select the real element on screen instead of describing file paths.
+					</p>
+				</div>
+				<div class="rounded-xl border border-zinc-200 bg-white p-[18px]">
+					<span class="mb-2.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-[13px] font-bold text-violet-700">
+						3
+					</span>
+					<h3 class="mb-2 text-[18px] text-slate-900">Describe the change</h3>
+					<p class="m-0 text-[15px] leading-[1.6] text-slate-600">
+						Use plain language: spacing, typography, hierarchy, copy, interaction states.
+					</p>
+				</div>
+				<div class="rounded-xl border border-zinc-200 bg-white p-[18px]">
+					<span class="mb-2.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-[13px] font-bold text-violet-700">
+						4
+					</span>
+					<h3 class="mb-2 text-[18px] text-slate-900">Review and ship</h3>
+					<p class="m-0 text-[15px] leading-[1.6] text-slate-600">
+						See the update instantly, iterate if needed, and send through normal code review.
+					</p>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="flex justify-center bg-[#09090b] px-5 py-16 text-zinc-50 md:px-6">
+		<div class="w-full max-w-[1080px]">
+			<h2 class="mb-5 text-[26px] font-bold tracking-[-0.02em] text-zinc-50 md:text-[32px]">
+				Comparison: Designer-to-Code Options
+			</h2>
+			<p class="mb-4 text-[17px] leading-[1.7] text-zinc-300">
+				These tools solve different parts of the workflow. Frontman is built for editing existing
+				production UI with runtime context.
+			</p>
+			<div class="overflow-x-auto rounded-xl border border-zinc-800">
+				<table class="w-full min-w-[940px] border-collapse">
+					<thead>
+						<tr>
+							<th class={tableHeaderClass}>Tool</th>
+							<th class={tableHeaderClass}>Best For</th>
+							<th class={tableHeaderClass}>Existing App</th>
+							<th class={tableHeaderClass}>Source Code Edits</th>
+							<th class={tableHeaderClass}>IDE Required</th>
+							<th class={tableHeaderClass}>Notes</th>
+						</tr>
+					</thead>
+					<tbody>
+						{comparisonRows.map((row) => (
+							<tr>
+								<td class={row.tool === 'Frontman' ? highlightedTableToolCellClass : tableToolCellClass}>
+									{row.tool}
+								</td>
+								<td class={row.tool === 'Frontman' ? highlightedTableCellClass : tableCellClass}>{row.bestFor}</td>
+								<td class={row.tool === 'Frontman' ? highlightedTableCellClass : tableCellClass}>{row.existingApp}</td>
+								<td class={row.tool === 'Frontman' ? highlightedTableCellClass : tableCellClass}>{row.sourceEdits}</td>
+								<td class={row.tool === 'Frontman' ? highlightedTableCellClass : tableCellClass}>{row.ideRequired}</td>
+								<td class={row.tool === 'Frontman' ? highlightedTableCellClass : tableCellClass}>{row.notes}</td>
+							</tr>
+						))}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</section>
+
+	<section class="flex justify-center bg-zinc-50 px-5 py-16 text-[#09090b] md:px-6">
+		<div class="w-full max-w-[760px]">
+			<h2 class="mb-5 text-[26px] font-bold tracking-[-0.02em] text-[#09090b] md:text-[32px]">
+				What designers can ship faster
+			</h2>
+			<div>
+				<ul class="my-3 list-none p-0">
+					<li class={`${proseBulletBaseClass} text-zinc-600`}>
+						Typography hierarchy fixes across marketing pages and product surfaces.
+					</li>
+					<li class={`${proseBulletBaseClass} text-zinc-600`}>
+						Spacing and alignment consistency in reusable components.
+					</li>
+					<li class={`${proseBulletBaseClass} text-zinc-600`}>
+						Copy and CTA refinements discovered during product reviews.
+					</li>
+					<li class={`${proseBulletBaseClass} text-zinc-600`}>
+						Responsive tweaks for breakpoints that are hard to catch in design files.
+					</li>
+					<li class={`${proseBulletBaseClass} text-zinc-600`}>
+						Small visual QA issues before launch, without creating ticket debt.
+					</li>
+				</ul>
+				<p class="mb-0 text-[17px] leading-[1.7] text-zinc-600">
+					For deeper architecture context, see <a href="/how-it-works/" class={textLinkClass}>how Frontman works</a>.
+					For tool-level tradeoffs, see <a href="/compare/" class={textLinkClass}>the full comparison matrix</a>.
+				</p>
+			</div>
+		</div>
+	</section>
+
+	<UseCaseFaqSection faqs={faqs} />
+
+	<UseCaseCtaSection
+		title="Design on the real thing"
+		description="If your team is tired of visual ticket ping-pong, start with one page and one workflow."
+		secondaryLinks={[
+			{href: '/use-cases/frontend-developers/', label: 'Frontend developer workflow'},
+			{href: '/integrations/', label: 'Supported integrations'},
+		]}
+	/>
+</Layout>
