@@ -3,15 +3,25 @@ defmodule SwarmAi.LLM.Response do
   Normalized response from an LLM call.
 
   Adapters convert provider-specific responses to this canonical format.
-  Can be built from a stream via `from_stream/1`.
+  Can be built from a ReqLLM stream via `from_stream/1`.
   """
   use TypedStruct
 
   require Logger
 
-  alias SwarmAi.LLM.{Chunk, Usage}
+  alias ReqLLM.StreamChunk
+  alias SwarmAi.LLM.Usage
 
-  @type finish_reason :: :stop | :tool_calls | :length | :error | nil
+  @type finish_reason ::
+          :stop
+          | :tool_calls
+          | :length
+          | :error
+          | :content_filter
+          | :cancelled
+          | :incomplete
+          | :unknown
+          | nil
 
   typedstruct do
     field(:content, String.t())
@@ -29,150 +39,297 @@ defmodule SwarmAi.LLM.Response do
   def has_tool_calls?(%__MODULE__{tool_calls: _}), do: true
 
   @doc """
-  Build a Response from a stream of chunks.
+  Build a Response from a stream of ReqLLM chunks.
 
   This is the batch-style convenience for when you don't need real-time
   token emission. Consumes the entire stream and returns the collected response.
-
-  Handles streaming tool calls by accumulating argument fragments:
-  - `:tool_call_start` - begins tracking a new tool call
-  - `:tool_call_args` - accumulates argument JSON fragments
-  - `:tool_call_end` - complete tool call (non-streaming case)
   """
-  @spec from_stream(Enumerable.t(Chunk.t())) :: t()
+  @spec from_stream(Enumerable.t(StreamChunk.t())) :: t()
   def from_stream(stream) do
-    acc = %{
-      content: [],
-      reasoning_details: [],
-      # Complete tool calls (from :tool_call_end chunks)
-      tool_calls: %{},
-      # Pending tool calls being accumulated (from streaming)
-      # Key: index, Value: %{id: string, name: string, args_fragments: [string]}
-      pending_tool_calls: %{},
-      usage: nil,
-      finish_reason: :stop,
-      metadata: %{}
-    }
-
-    result = Enum.reduce(stream, acc, &accumulate_chunk/2)
-
-    # Finalize any pending streaming tool calls
-    finalized_pending = finalize_pending_tool_calls(result.pending_tool_calls)
-
-    # Merge complete tool calls with finalized pending ones
-    all_tool_calls = Map.merge(result.tool_calls, finalized_pending)
+    result = Enum.reduce(stream, initial_stream_state(), &accumulate_chunk/2)
 
     %__MODULE__{
       content: IO.iodata_to_binary(result.content),
-      reasoning_details: result.reasoning_details,
-      tool_calls: Map.values(all_tool_calls),
-      usage: result.usage,
-      finish_reason: result.finish_reason,
+      reasoning_details: Enum.reverse(result.reasoning_details),
+      tool_calls: finalize_tool_calls(result.tool_calls_by_id, result.fragments_by_index),
+      usage: build_usage(result.usage),
+      finish_reason: result.finish_reason || :stop,
       metadata: result.metadata
     }
   end
 
-  defp accumulate_chunk(%Chunk{type: :token, text: text}, acc) do
+  defp initial_stream_state do
+    %{
+      content: [],
+      reasoning_details: [],
+      reasoning_index: 0,
+      tool_calls_by_id: %{},
+      tool_call_indexes: MapSet.new(),
+      fragments_by_index: %{},
+      usage: nil,
+      finish_reason: nil,
+      metadata: %{}
+    }
+  end
+
+  defp accumulate_chunk(%StreamChunk{type: :content, text: text}, acc) when is_binary(text) do
     %{acc | content: [acc.content, text]}
   end
 
-  defp accumulate_chunk(%Chunk{type: :thinking, text: text, metadata: meta}, acc) do
-    entry = build_reasoning_entry(text, meta, length(acc.reasoning_details))
-    %{acc | reasoning_details: acc.reasoning_details ++ [entry]}
+  defp accumulate_chunk(
+         %StreamChunk{type: :thinking, text: text, metadata: metadata},
+         acc
+       )
+       when is_binary(text) do
+    entry = build_reasoning_entry(text, metadata || %{}, acc.reasoning_index)
+
+    %{
+      acc
+      | reasoning_details: [entry | acc.reasoning_details],
+        reasoning_index: acc.reasoning_index + 1
+    }
   end
 
-  # Streaming: tool call name received, start accumulating
   defp accumulate_chunk(
-         %Chunk{
-           type: :tool_call_start,
-           tool_call_id: id,
-           tool_call_name: name,
-           tool_call_index: index
-         },
+         %StreamChunk{type: :tool_call, name: name, arguments: arguments, metadata: metadata},
          acc
        ) do
-    pending = %{id: id, name: name, args_fragments: []}
-    %{acc | pending_tool_calls: Map.put(acc.pending_tool_calls, index, pending)}
-  end
+    metadata = metadata || %{}
 
-  # Streaming: argument fragment received, accumulate it
-  defp accumulate_chunk(
-         %Chunk{type: :tool_call_args, tool_call_index: index, tool_call_args_fragment: fragment},
-         acc
-       ) do
-    case Map.get(acc.pending_tool_calls, index) do
-      nil ->
-        # This is a bug - we received arguments before tool_call_start
-        raise ArgumentError,
-              "Received tool_call_args for index #{index} but no tool_call_start was received. " <>
-                "This indicates a bug in the streaming pipeline."
+    case {meta_field(metadata, :id), normalize_index(meta_field(metadata, :index) || 0)} do
+      {id, index} when is_binary(id) and is_integer(index) ->
+        call = %{id: id, name: name, arguments: arguments, index: index}
 
-      pending ->
-        updated = %{pending | args_fragments: pending.args_fragments ++ [fragment]}
-        %{acc | pending_tool_calls: Map.put(acc.pending_tool_calls, index, updated)}
+        %{
+          acc
+          | tool_calls_by_id: Map.put(acc.tool_calls_by_id, id, call),
+            tool_call_indexes: MapSet.put(acc.tool_call_indexes, index)
+        }
+
+      _other ->
+        acc
     end
   end
 
-  # Non-streaming: complete tool call received
-  defp accumulate_chunk(%Chunk{type: :tool_call_end, tool_call: tool_call}, acc) do
-    %{acc | tool_calls: Map.put(acc.tool_calls, tool_call.id, tool_call)}
+  defp accumulate_chunk(%StreamChunk{type: :meta, metadata: metadata}, acc) do
+    metadata = metadata || %{}
+
+    acc
+    |> accumulate_tool_call_fragment(metadata)
+    |> maybe_put_usage(metadata)
+    |> maybe_put_finish_reason(metadata)
+    |> maybe_put_response_metadata(metadata)
   end
 
-  defp accumulate_chunk(%Chunk{type: :usage, usage: usage}, acc) do
-    %{acc | usage: usage}
-  end
-
-  defp accumulate_chunk(%Chunk{type: :done, finish_reason: reason, metadata: meta}, acc) do
-    # Don't let a :stop done chunk (from message_stop) overwrite a more specific
-    # finish_reason already set by message_delta (e.g., :length, :tool_calls).
-    # The message_delta carries the authoritative stop_reason from the provider.
-    finish_reason =
-      if acc.finish_reason in [:stop, nil] do
-        reason
-      else
-        acc.finish_reason
-      end
-
-    %{acc | finish_reason: finish_reason, metadata: Map.merge(acc.metadata, meta || %{})}
-  end
-
-  # Catch-all for unknown chunk types
   defp accumulate_chunk(_chunk, acc), do: acc
 
-  # Finalize pending tool calls by joining accumulated argument fragments
-  # NOTE: We do NOT fall back to "{}" on JSON parse failure - this masks issues
-  # where the LLM generates malformed tool calls. Let the error surface at execution.
-  defp finalize_pending_tool_calls(pending_map) do
-    require Logger
+  defp accumulate_tool_call_fragment(acc, metadata) do
+    case extract_tool_call_fragment(metadata) do
+      {:ok, index, fragment} ->
+        if not MapSet.member?(acc.tool_call_indexes, index) do
+          raise ArgumentError,
+                "Received tool_call_args for index #{index} but no tool_call_start was received. " <>
+                  "This indicates a bug in the streaming pipeline."
+        end
 
-    Map.new(pending_map, fn {_index, %{id: id, name: name, args_fragments: fragments}} ->
-      args_json = IO.iodata_to_binary(fragments)
+        %{
+          acc
+          | fragments_by_index:
+              Map.update(acc.fragments_by_index, index, fragment, &(&1 <> fragment))
+        }
 
-      # Log warning if arguments are empty or invalid JSON (helps debug LLM issues)
-      case {args_json, Jason.decode(args_json)} do
-        {"", _} ->
-          Logger.warning(
-            "Tool call #{name} (#{id}) has empty arguments - LLM may have failed to provide required parameters"
-          )
+      :error ->
+        acc
+    end
+  end
 
-        {_, {:error, _}} ->
-          Logger.warning(
-            "Tool call #{name} (#{id}) has invalid JSON arguments: #{inspect(args_json)}"
-          )
+  defp finalize_tool_calls(tool_calls_by_id, fragments_by_index) do
+    malformed_indexes = malformed_fragment_indexes(fragments_by_index)
 
-        _ ->
-          :ok
-      end
+    tool_calls_by_id
+    |> Map.values()
+    |> Enum.sort_by(& &1.index)
+    |> Enum.map(fn %{id: id, index: index, name: name, arguments: start_arguments} ->
+      arguments =
+        resolve_tool_call_arguments(
+          id,
+          name,
+          index,
+          start_arguments,
+          fragments_by_index,
+          malformed_indexes
+        )
 
-      # Keep original args_json (even if empty/invalid) - don't mask with "{}"
-      {id, %SwarmAi.ToolCall{id: id, name: name, arguments: args_json}}
+      %SwarmAi.ToolCall{id: id, name: name, arguments: arguments}
     end)
   end
 
-  defp build_reasoning_entry(text, meta, index) do
-    # Merge provider metadata with text and index
-    meta
+  defp extract_tool_call_fragment(metadata) do
+    case meta_field(metadata, :tool_call_args) do
+      %{index: index, fragment: fragment} when is_binary(fragment) ->
+        case normalize_index(index) do
+          normalized when is_integer(normalized) -> {:ok, normalized, fragment}
+          _other -> :error
+        end
+
+      %{"index" => index, "fragment" => fragment} when is_binary(fragment) ->
+        case normalize_index(index) do
+          normalized when is_integer(normalized) -> {:ok, normalized, fragment}
+          _other -> :error
+        end
+
+      _other ->
+        :error
+    end
+  end
+
+  defp malformed_fragment_indexes(fragments_by_index) do
+    Enum.reduce(fragments_by_index, MapSet.new(), fn {index, fragment}, acc ->
+      case Jason.decode(fragment) do
+        {:ok, _decoded} -> acc
+        {:error, _decode_error} -> MapSet.put(acc, index)
+      end
+    end)
+  end
+
+  defp resolve_tool_call_arguments(
+         id,
+         name,
+         index,
+         start_arguments,
+         fragments_by_index,
+         malformed_indexes
+       ) do
+    cond do
+      MapSet.member?(malformed_indexes, index) ->
+        raw = Map.fetch!(fragments_by_index, index)
+
+        Logger.warning("Tool call #{name} (#{id}) has invalid JSON arguments: #{inspect(raw)}")
+
+        raw
+
+      Map.has_key?(fragments_by_index, index) ->
+        Map.fetch!(fragments_by_index, index)
+
+      empty_tool_call_arguments?(start_arguments) ->
+        Logger.warning(
+          "Tool call #{name} (#{id}) missing streamed argument fragments; preserving empty arguments"
+        )
+
+        ""
+
+      true ->
+        encode_tool_call_arguments(start_arguments)
+    end
+  end
+
+  defp encode_tool_call_arguments(nil), do: "{}"
+  defp encode_tool_call_arguments(args) when is_binary(args), do: args
+  defp encode_tool_call_arguments(args) when is_map(args), do: Jason.encode!(args)
+  defp encode_tool_call_arguments(args), do: Jason.encode!(args)
+
+  defp empty_tool_call_arguments?(nil), do: true
+
+  defp empty_tool_call_arguments?(args) when is_binary(args) do
+    String.trim(args) in ["", "{}"]
+  end
+
+  defp empty_tool_call_arguments?(args) when is_map(args), do: map_size(args) == 0
+  defp empty_tool_call_arguments?(_), do: false
+
+  defp build_reasoning_entry(text, metadata, index) do
+    metadata
     |> Map.put("text", text)
     |> Map.put("index", index)
   end
+
+  defp build_usage(nil), do: nil
+  defp build_usage(usage) when is_map(usage), do: Usage.from_map(usage)
+  defp build_usage(_other), do: nil
+
+  defp maybe_put_usage(acc, metadata) do
+    case meta_field(metadata, :usage) do
+      usage when is_map(usage) -> %{acc | usage: usage}
+      _other -> acc
+    end
+  end
+
+  defp maybe_put_finish_reason(acc, metadata) do
+    case normalize_finish_reason(meta_field(metadata, :finish_reason)) do
+      nil -> acc
+      reason -> %{acc | finish_reason: merge_finish_reason(acc.finish_reason, reason)}
+    end
+  end
+
+  defp merge_finish_reason(current, reason) when current in [nil, :stop], do: reason
+  defp merge_finish_reason(current, _reason), do: current
+
+  defp maybe_put_response_metadata(acc, metadata) do
+    %{
+      acc
+      | metadata:
+          acc.metadata
+          |> maybe_put_response_id(metadata)
+          |> maybe_put_phase(metadata)
+          |> maybe_put_phase_items(metadata)
+    }
+  end
+
+  defp maybe_put_response_id(metadata, source) do
+    case meta_field(source, :response_id) do
+      id when is_binary(id) -> Map.put(metadata, :response_id, id)
+      _other -> metadata
+    end
+  end
+
+  defp maybe_put_phase(metadata, source) do
+    case meta_field(source, :phase) do
+      phase when is_binary(phase) -> Map.put(metadata, :phase, phase)
+      _other -> metadata
+    end
+  end
+
+  defp maybe_put_phase_items(metadata, source) do
+    case meta_field(source, :phase_items) do
+      phase_items when is_list(phase_items) and phase_items != [] ->
+        Map.put(metadata, :phase_items, phase_items)
+
+      _other ->
+        metadata
+    end
+  end
+
+  defp meta_field(map, key) when is_map(map) and is_atom(key) do
+    Map.get(map, key) || Map.get(map, Atom.to_string(key))
+  end
+
+  defp normalize_index(index) when is_integer(index), do: index
+
+  defp normalize_index(index) when is_binary(index) do
+    case Integer.parse(index) do
+      {value, ""} -> value
+      _other -> :error
+    end
+  end
+
+  defp normalize_index(_other), do: :error
+
+  defp normalize_finish_reason(nil), do: nil
+
+  defp normalize_finish_reason(reason) when is_atom(reason),
+    do: normalize_finish_reason(Atom.to_string(reason))
+
+  defp normalize_finish_reason("stop"), do: :stop
+  defp normalize_finish_reason("completed"), do: :stop
+  defp normalize_finish_reason("tool_calls"), do: :tool_calls
+  defp normalize_finish_reason("length"), do: :length
+  defp normalize_finish_reason("max_tokens"), do: :length
+  defp normalize_finish_reason("max_output_tokens"), do: :length
+  defp normalize_finish_reason("content_filter"), do: :content_filter
+  defp normalize_finish_reason("tool_use"), do: :tool_calls
+  defp normalize_finish_reason("end_turn"), do: :stop
+  defp normalize_finish_reason("error"), do: :error
+  defp normalize_finish_reason("cancelled"), do: :cancelled
+  defp normalize_finish_reason("incomplete"), do: :incomplete
+  defp normalize_finish_reason(_other), do: :unknown
 end
