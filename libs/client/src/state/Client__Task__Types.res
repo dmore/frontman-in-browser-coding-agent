@@ -809,6 +809,34 @@ let annotationMetaSchema: S.t<annotationMeta> = S.object(s => {
 let elementorText = (context: Client__ElementorDetection.t, ~tagName: string): string =>
   Client__ElementorDetection.summary(context, ~tagName)
 
+let elementorTargetText = (context: Client__ElementorDetection.t): string =>
+  switch context.postId {
+  | Some(postId) => `post_id=${postId->Int.toString}, element_id=${context.elementId}`
+  | None => `element_id=${context.elementId}`
+  }
+
+let nearbyTextWithElementorHint = (
+  ~nearbyText: option<string>,
+  ~elementorContext: option<Client__ElementorDetection.t>,
+  ~tagName: string,
+): option<string> =>
+  switch elementorContext {
+  | Some(context) => {
+      let hint = `Detected editing context: Elementor ${elementorTargetText(
+          context,
+        )}. ${elementorText(context, ~tagName)}`
+      switch nearbyText {
+      | Some(text) =>
+        switch text->String.includes("Detected editing context: Elementor") {
+        | true => Some(text)
+        | false => Some(`${text}\n\n${hint}`)
+        }
+      | None => Some(hint)
+      }
+    }
+  | None => nearbyText
+  }
+
 type screenshotMeta = {
   annotationScreenshot: bool,
   annotationIndex: int,
@@ -865,7 +893,11 @@ let makeAnnotationMeta = (
       componentProps,
       parent,
       cssClasses: annotation.cssClasses,
-      nearbyText: annotation.nearbyText,
+      nearbyText: nearbyTextWithElementorHint(
+        ~nearbyText=annotation.nearbyText,
+        ~elementorContext=annotation.elementorContext,
+        ~tagName=annotation.tagName,
+      ),
       elementorContext: annotation.elementorContext,
       boundingBox: annotation.boundingBox->Option.map(bb => {
         x: bb.x,
@@ -1310,7 +1342,11 @@ let makeMessageAnnotationMeta = (annotation: Message.MessageAnnotation.t, ~index
       componentProps,
       parent,
       cssClasses: annotation.cssClasses,
-      nearbyText: annotation.nearbyText,
+      nearbyText: nearbyTextWithElementorHint(
+        ~nearbyText=annotation.nearbyText,
+        ~elementorContext=annotation.elementorContext,
+        ~tagName=annotation.tagName,
+      ),
       elementorContext: annotation.elementorContext,
       boundingBox: annotation.boundingBox->Option.map(bb => {
         x: bb.x,

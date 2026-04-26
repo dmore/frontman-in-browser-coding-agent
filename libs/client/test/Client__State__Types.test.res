@@ -334,12 +334,17 @@ describe("Client__State__Types", () => {
         let embeddedResource = getEmbeddedResource(blocks->Array.getUnsafe(0))
         let meta = getMeta(blocks->Array.getUnsafe(0))
         let elementor = getMetaObject(meta, "elementor")
+        let nearbyText = getMetaString(meta, "nearby_text")
 
         t
         ->expect(
           elementor->Dict.get("element_id")->Option.flatMap(JSON.Decode.string)->Option.getOrThrow,
         )
         ->Expect.toBe("abc12345")
+        t->expect(nearbyText->String.includes("Hero title"))->Expect.toBe(true)
+        t->expect(nearbyText->String.includes("Detected editing context"))->Expect.toBe(true)
+        t->expect(nearbyText->String.includes("Elementor"))->Expect.toBe(true)
+        t->expect(nearbyText->String.includes("abc12345"))->Expect.toBe(true)
 
         switch embeddedResource.resource {
         | TextResourceContents(textResource) =>
@@ -612,6 +617,40 @@ describe("messageAnnotationsToContentBlocks", () => {
     t->expect(getMetaString(meta, "annotation_id"))->Expect.toBe("ann-1")
     t->expect(getMetaString(meta, "tag_name"))->Expect.toBe("button")
     t->expect(getMetaString(meta, "comment"))->Expect.toBe("Fix this")
+  })
+
+  test("adds Elementor edit hint to serialized message annotation nearby_text", t => {
+    let annotations: array<MessageAnnotation.t> = [
+      {
+        id: "ann-elementor",
+        selector: Ok(None),
+        tagName: "label",
+        cssClasses: None,
+        comment: Some("remove"),
+        screenshot: Ok(None),
+        sourceLocation: Ok(None),
+        boundingBox: None,
+        nearbyText: Some("I agree to the terms and conditions"),
+        elementorContext: Some({
+          postId: Some(22744),
+          elementId: "b535bb8",
+          elementType: Some("widget"),
+          widgetType: Some("html"),
+          documentType: Some("wp-page"),
+          editHint: "Use Elementor tools for edits",
+        }),
+      },
+    ]
+
+    let blocks = Types.messageAnnotationsToContentBlocks(annotations)
+    let meta = getMeta(blocks->Array.getUnsafe(0))
+    let nearbyText = getMetaString(meta, "nearby_text")
+
+    t->expect(nearbyText->String.includes("I agree to the terms and conditions"))->Expect.toBe(true)
+    t->expect(nearbyText->String.includes("Detected editing context"))->Expect.toBe(true)
+    t->expect(nearbyText->String.includes("post_id=22744"))->Expect.toBe(true)
+    t->expect(nearbyText->String.includes("element_id=b535bb8"))->Expect.toBe(true)
+    t->expect(nearbyText->String.includes("Use Elementor tools for edits"))->Expect.toBe(true)
   })
 
   test("produces screenshot blocks when screenshot is present", t => {
