@@ -61,7 +61,7 @@ class Frontman_Elementor_Data {
     public static function save_page_data( int $post_id, array $data ): bool {
         $post = get_post( $post_id );
         if ( ! $post ) {
-            throw new \RuntimeException( 'Post not found: ' . $post_id );
+            throw new \RuntimeException( 'Post not found: ' . esc_html( (string) $post_id ) );
         }
 
         update_post_meta( $post_id, '_elementor_edit_mode', 'builder' );
@@ -206,7 +206,7 @@ class Frontman_Elementor_Data {
             return null;
         }
         if ( count( $contexts ) > 1 ) {
-            throw new Frontman_Tool_Error( 'Element ID is duplicated; refusing to create an ambiguous rollback: ' . $element_id );
+            throw new Frontman_Tool_Error( 'Element ID is duplicated; refusing to create an ambiguous rollback: ' . esc_html( $element_id ) );
         }
 
         $context = $contexts[0];
@@ -363,13 +363,13 @@ class Frontman_Elementor_Data {
                 return self::widget( 'text-editor', array_merge( [ 'editor' => wp_kses_post( $input['content'] ?? '' ) ], $settings ) );
             case 'image':
                 $attachment_id = absint( $input['attachment_id'] ?? 0 );
-                return self::widget( 'image', array_merge( [ 'image' => [ 'id' => $attachment_id, 'url' => $attachment_id ? wp_get_attachment_url( $attachment_id ) : '' ], 'image_size' => 'large' ], $settings ) );
+                return self::widget( 'image', array_merge( [ 'image' => [ 'id' => $attachment_id, 'url' => $attachment_id ? wp_get_attachment_url( $attachment_id ) : '', 'source' => 'library' ], 'image_size' => 'large' ], $settings ) );
             case 'button':
                 return self::widget( 'button', array_merge( [ 'text' => sanitize_text_field( $input['button_text'] ?? 'Click' ), 'link' => [ 'url' => esc_url_raw( $input['url'] ?? '#' ) ] ], $settings ) );
             case 'widget':
                 return self::widget( sanitize_key( $input['widget_type'] ?? 'heading' ), $settings );
             default:
-                throw new \RuntimeException( 'Unsupported Elementor element generator type: ' . $type );
+                throw new \RuntimeException( 'Unsupported Elementor element generator type: ' . esc_html( $type ) );
         }
     }
 
@@ -434,7 +434,7 @@ class Frontman_Elementor_Data {
             $upload_dir = wp_upload_dir();
             $css_path   = trailingslashit( $upload_dir['basedir'] ?? '' ) . 'elementor/css/post-' . $post_id . '.css';
             if ( file_exists( $css_path ) ) {
-                @unlink( $css_path );
+                wp_delete_file( $css_path );
             }
         }
     }

@@ -4,7 +4,7 @@ Tags: ai, editing, content, gutenberg, blocks
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 0.15.0
+Stable tag: 0.16.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,7 +44,7 @@ This is an experimental release. It works, but it hasn't been tested across ever
 
 == Installation ==
 
-1. Download the Frontman plugin release ZIP or upload the `frontman` folder to `/wp-content/plugins/`
+1. Download the Frontman plugin release ZIP or upload the `frontman-agentic-ai-editor` folder to `/wp-content/plugins/`
 2. Activate the plugin through the **Plugins** menu
 3. Navigate to `/frontman` on your site (you must be logged in as an admin)
 4. Use Frontman - WordPress tools, file inspection, and managed child-theme editing now run directly inside the plugin
@@ -96,6 +96,14 @@ Loading the Frontman UI requests hosted client assets. Your site content is not 
 1. The Frontman chat interface alongside your WordPress site
 
 == Changelog ==
+
+= 0.16.1 =
+* Fix image attachment uploads for WordPress media replacement workflows
+* Strengthen Elementor rollback safety for precise widget and HTML-fragment edits
+
+= 0.16.0 =
+* Sync the Frontman plugin release with Frontman v0.16.0
+* See the GitHub release notes for the full cross-product changelog
 
 = 0.15.0 =
 * Sync the Frontman plugin release with Frontman v0.15.0
