@@ -417,7 +417,7 @@ module Selectors = {
   }
 
   // Resolve an image attachment URI from a specific task's accumulated attachments.
-  // Used by the MCP server to resolve write_file image_ref before forwarding to relay.
+  // Used by the MCP server before forwarding attachment-aware tools to relay.
   // Takes taskId (not currentTask) because the agent's task may differ from the viewed tab.
   let resolveImageRef = (state: state, ~taskId: string, ~uri: string): option<
     Message.resolvedImageData,
@@ -601,10 +601,10 @@ let buildAttachmentContentBlocks = (attachments: array<Client__Message.fileAttac
     | idx => att.dataUrl->String.slice(~start=idx + 8, ~end=String.length(att.dataUrl))
     }
 
-    // Build _meta JSON
-    let meta: JSON.t = %raw(`(function(filename) {
-      return { "user_image": true, "filename": filename };
-    })`)(att.filename)
+    let metaObj = Dict.make()
+    metaObj->Dict.set("user_image", JSON.Encode.bool(true))
+    metaObj->Dict.set("filename", JSON.Encode.string(att.filename))
+    let meta = JSON.Encode.object(metaObj)
 
     Client__State__Types.ACPTypes.EmbeddedResource({
       resource: {
