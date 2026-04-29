@@ -288,7 +288,9 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
     Before making recommendations or changes, inspect the relevant WordPress data and files first.
 
     **Elementor**:
-    Selected Elementor IDs are whole widgets/containers. For nested HTML-widget DOM, edit `settings.html` with `wp_elementor_replace_html_fragment`. Remove elements only when the user explicitly wants the whole widget/container removed, using `scope=whole_element`.
+    - Inspect the Elementor target first, then use `wp_elementor_update_element` for granular edits. It inspects the actual Elementor element and handles normal settings updates vs HTML-widget fragment updates from `old_html`/`new_html`.
+    - Mutate WordPress/Elementor state one tool call at a time. Restore Elementor rollbacks one at a time; never batch `wp_elementor_restore_rollback`.
+    - Remove elements only when the user explicitly wants the whole widget/container removed, using `scope=whole_element`.
 
     **Attachments**:
     Use `wp_upload_media` with `image_ref` only when the user asks to use an attachment; then use the returned `attachment_id`/`url`. Do not upload unused attachments.

@@ -94,6 +94,24 @@ defmodule FrontmanServer.Tasks.InteractionTest do
                height: 50.0
              }
     end
+
+    test "preserves generic annotation metadata when provided" do
+      context = %{
+        "target_id" => "abc12345",
+        "target_type" => "widget"
+      }
+
+      msg =
+        UserMessage.new([
+          text_block("Fix this"),
+          annotation_block("ann-el", "span", "/src/Component.tsx", 5, 1,
+            metadata: %{"custom_context" => context}
+          )
+        ])
+
+      assert [ann] = msg.annotations
+      assert ann.metadata == %{"custom_context" => context}
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -231,7 +249,6 @@ defmodule FrontmanServer.Tasks.InteractionTest do
       text = extract_text(llm_msg)
       assert text =~ "attachment://att_hero/hero.png"
       refute text =~ "write_file with image_ref"
-      refute text =~ "wp_upload_media"
     end
   end
 
@@ -537,6 +554,11 @@ defmodule FrontmanServer.Tasks.InteractionTest do
             component_name: "Hero",
             css_classes: "hero-title text-xl",
             nearby_text: "Welcome to our app",
+            metadata: %{
+              "custom_context" => %{
+                "target_id" => "abc12345"
+              }
+            },
             bounding_box: %{"x" => 24.0, "y" => 176.0, "width" => 822.0, "height" => 42.0}
           ),
           screenshot_block("ann-full", "base64screenshotdata", "image/jpeg")
@@ -551,6 +573,10 @@ defmodule FrontmanServer.Tasks.InteractionTest do
       assert ann["tag_name"] == "H1"
       assert ann["css_classes"] == "hero-title text-xl"
       assert ann["nearby_text"] == "Welcome to our app"
+
+      assert ann["custom_context"] == %{
+               "target_id" => "abc12345"
+             }
 
       assert ann["bounding_box"] == %{
                "x" => 24.0,

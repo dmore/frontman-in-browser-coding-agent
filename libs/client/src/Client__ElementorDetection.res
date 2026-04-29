@@ -82,7 +82,7 @@ let _makeHint = (~postId: option<int>, ~elementId: string): string => {
   | Some(id) => `post_id=${id->Int.toString}, element_id=${elementId}`
   | None => `element_id=${elementId}`
   }
-  `This selected element is an Elementor element (${target}). Prefer the wp_elementor_* tools for structural/content/style edits; start with wp_elementor_get_element or wp_elementor_get_page_structure, and call wp_elementor_flush_css after visual changes.`
+  `Elementor target (${target}). Prefer wp_elementor_update_element for granular edits; inspect first so the tool can use Elementor element props to choose settings vs HTML-fragment updates.`
 }
 
 let getElementorContext = (
@@ -107,7 +107,6 @@ let getElementorContext = (
         | Some(root) => _attr(root, "data-elementor-type")
         | None => None
         }
-
         Some({
           postId,
           elementId,

@@ -69,6 +69,37 @@ defmodule FrontmanServer.Protocols.AcpHistoryTest do
       assert items != []
     end
 
+    test "UserMessage annotation keeps generic metadata" do
+      metadata = %{
+        "custom_context" => %{
+          "target_id" => "abc12345",
+          "target_type" => "widget"
+        }
+      }
+
+      interaction = %Interaction.UserMessage{
+        id: "um-elementor",
+        timestamp: DateTime.utc_now(),
+        messages: [],
+        images: [],
+        annotations: [
+          %Interaction.Annotation{
+            annotation_id: "ann-1",
+            annotation_index: 0,
+            tag_name: "span",
+            metadata: metadata
+          }
+        ]
+      }
+
+      [item] = ACPHistory.to_history_items(interaction, @session_id)
+      resource = item["params"]["update"]["content"]["resource"]
+
+      assert resource["_meta"]["custom_context"] == metadata["custom_context"]
+      assert resource["resource"]["uri"] == "element://span"
+      assert resource["resource"]["text"] == "Annotated element: <span>"
+    end
+
     test "AgentResponse" do
       interaction = %Interaction.AgentResponse{
         id: "ar-1",

@@ -281,11 +281,32 @@ defmodule FrontmanServer.Tasks.Interaction do
       field(:parent, ParentLocation.t() | nil)
       field(:css_classes, String.t() | nil)
       field(:nearby_text, String.t() | nil)
+      field(:metadata, map(), default: %{})
       field(:bounding_box, BoundingBox.t() | nil)
       field(:screenshot, Screenshot.t() | nil)
     end
 
     alias FrontmanServer.Tasks.Interaction
+
+    @known_meta_keys ~w(
+      annotation
+      annotation_id
+      annotation_index
+      annotation_screenshot
+      bounding_box
+      column
+      comment
+      component_name
+      component_props
+      css_classes
+      file
+      line
+      metadata
+      nearby_text
+      parent
+      screenshot
+      tag_name
+    )
 
     @doc """
     Builds an Annotation from a map with string or atom keys.
@@ -308,10 +329,32 @@ defmodule FrontmanServer.Tasks.Interaction do
         parent: ParentLocation.from_map(Interaction.get_flex(data, "parent")),
         css_classes: Interaction.get_flex(data, "css_classes"),
         nearby_text: Interaction.get_flex(data, "nearby_text"),
+        metadata: metadata_from_map(data),
         bounding_box: BoundingBox.from_map(Interaction.get_flex(data, "bounding_box")),
         screenshot: Screenshot.from_map(Interaction.get_flex(data, "screenshot"))
       }
     end
+
+    defp metadata_from_map(data) do
+      inline_metadata = data |> stringify_keys() |> drop_known_metadata()
+
+      explicit_metadata =
+        data |> Interaction.get_flex("metadata") |> stringify_keys() |> drop_known_metadata()
+
+      Map.merge(inline_metadata, explicit_metadata)
+    end
+
+    defp stringify_keys(map) when is_map(map) do
+      Map.new(map, fn {key, value} -> {to_string(key), value} end)
+    end
+
+    defp stringify_keys(_), do: %{}
+
+    defp drop_known_metadata(metadata),
+      do:
+        metadata
+        |> Map.drop(@known_meta_keys)
+        |> Map.reject(fn {_key, value} -> is_nil(value) end)
 
     @doc """
     Builds an Annotation from an ACP `_meta` block, pairing with a separate
@@ -551,7 +594,7 @@ defmodule FrontmanServer.Tasks.Interaction do
           }
 
           # Strip nil values to keep JSON compact
-          base
+          Map.merge(ann.metadata || %{}, base)
           |> Enum.reject(fn {_k, v} -> is_nil(v) end)
           |> Map.new()
         end)

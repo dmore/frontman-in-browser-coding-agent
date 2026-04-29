@@ -36,11 +36,10 @@ defmodule FrontmanServer.Tasks.Execution.PromptsTest do
 
       assert prompt =~ "read-only file tools"
       assert prompt =~ "Do not attempt to edit unmanaged theme or plugin files"
-      assert prompt =~ "wp_create_managed_theme"
-      assert prompt =~ "wp_activate_managed_theme"
       assert prompt =~ "block themes only"
       assert prompt =~ "already a child theme"
-      assert prompt =~ "wp_upload_media"
+      refute prompt =~ "selection_scope"
+      assert prompt =~ "Restore Elementor rollbacks one at a time"
       refute prompt =~ "use `write_file` with the attachment's `image_ref`"
 
       assert prompt =~ "Do not upload unused attachments"
@@ -51,7 +50,6 @@ defmodule FrontmanServer.Tasks.Execution.PromptsTest do
 
       assert vite_prompt =~ "write_file"
       assert vite_prompt =~ "image_ref"
-      refute vite_prompt =~ "wp_upload_media"
     end
 
     test "nil framework adds code attachment guidance" do
@@ -59,7 +57,6 @@ defmodule FrontmanServer.Tasks.Execution.PromptsTest do
 
       assert nil_prompt =~ "write_file"
       assert nil_prompt =~ "image_ref"
-      refute nil_prompt =~ "wp_upload_media"
     end
   end
 

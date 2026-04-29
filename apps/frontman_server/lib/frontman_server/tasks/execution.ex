@@ -78,7 +78,8 @@ defmodule FrontmanServer.Tasks.Execution do
     case Providers.prepare_api_key(scope, model) do
       {:ok, api_key_info} ->
         task_id = task.task_id
-        agent = build_agent(task, tools, opts, api_key_info)
+        framework = Framework.from_string(task.framework)
+        agent = build_agent(task, tools, opts, api_key_info, framework)
 
         messages =
           task.interactions
@@ -95,6 +96,7 @@ defmodule FrontmanServer.Tasks.Execution do
           api_key_info: api_key_info,
           mcp_tool_defs: mcp_tool_defs,
           backend_tool_modules: backend_tool_modules,
+          execution_framework: framework,
           interaction_id: Keyword.get(opts, :interaction_id)
         )
 
@@ -131,6 +133,7 @@ defmodule FrontmanServer.Tasks.Execution do
   @dialyzer {:nowarn_function, submit_to_runtime: 5}
   defp submit_to_runtime(scope, agent, task_id, messages, opts) do
     %ResolvedKey{} = resolved_key = Keyword.fetch!(opts, :api_key_info)
+    execution_framework = Keyword.fetch!(opts, :execution_framework)
 
     mcp_tools = Map.get(agent, :tools, [])
     mcp_tool_defs = Keyword.get(opts, :mcp_tool_defs, [])
@@ -139,6 +142,8 @@ defmodule FrontmanServer.Tasks.Execution do
     llm_opts =
       [api_key: resolved_key.api_key, model: resolved_key.model]
       |> maybe_enable_prompt_cache(resolved_key.provider)
+
+    llm_opts = maybe_disable_parallel_tool_calls(execution_framework, llm_opts)
 
     tool_executor =
       ToolExecutor.make_executor(scope, task_id,
@@ -161,7 +166,8 @@ defmodule FrontmanServer.Tasks.Execution do
              scope: scope,
              interaction_id: interaction_id
            },
-           tool_executor: tool_executor
+           tool_executor: tool_executor,
+           tool_execution_mode: tool_execution_mode(execution_framework)
          ) do
       {:ok, pid} ->
         {:ok, pid}
@@ -181,10 +187,19 @@ defmodule FrontmanServer.Tasks.Execution do
 
   defp maybe_enable_prompt_cache(opts, _provider), do: opts
 
-  defp build_agent(%Task{} = task, tools, opts, %ResolvedKey{} = resolved_key) do
+  defp maybe_disable_parallel_tool_calls(%Framework{id: :wordpress}, llm_opts) do
+    # WordPress tools mutate external state; serial calls avoid stale Elementor rollback races.
+    Keyword.put(llm_opts, :parallel_tool_calls, false)
+  end
+
+  defp maybe_disable_parallel_tool_calls(_framework, llm_opts), do: llm_opts
+
+  defp tool_execution_mode(%Framework{id: :wordpress}), do: :serial
+  defp tool_execution_mode(_framework), do: :parallel
+
+  defp build_agent(%Task{} = task, tools, opts, %ResolvedKey{} = resolved_key, fw) do
     case Keyword.get(opts, :agent) do
       nil ->
-        fw = Framework.from_string(task.framework)
         has_typescript_react = Framework.has_typescript_react?(fw)
 
         # Derive prompt data from task interactions
@@ -202,6 +217,7 @@ defmodule FrontmanServer.Tasks.Execution do
 
         max_tokens = Application.fetch_env!(:frontman_server, :llm_max_tokens)
         {model_spec, llm_opts} = Providers.to_llm_args(resolved_key, max_tokens: max_tokens)
+        llm_opts = maybe_disable_parallel_tool_calls(fw, llm_opts)
 
         RootAgent.new(
           tools: tools,

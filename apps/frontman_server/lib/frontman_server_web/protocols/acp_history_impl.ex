@@ -34,7 +34,8 @@ defimpl ACPHistory, for: Interaction.UserMessage do
     |> Enum.with_index()
     |> Enum.flat_map(fn {ann, index} ->
       meta =
-        %{
+        (ann.metadata || %{})
+        |> Map.merge(%{
           "annotation" => true,
           "annotation_index" => index,
           "annotation_id" => ann.annotation_id,
@@ -49,7 +50,7 @@ defimpl ACPHistory, for: Interaction.UserMessage do
           "css_classes" => ann.css_classes,
           "nearby_text" => ann.nearby_text,
           "bounding_box" => encode_bounding_box(ann.bounding_box)
-        }
+        })
         |> reject_nils()
 
       uri =
