@@ -1,5 +1,3 @@
-# Terms of Service
-
 ## Introduction
 
 Welcome to Frontman! By using our services, you agree to be bound by these terms and conditions. Please read them carefully.
@@ -77,8 +75,8 @@ These terms are governed by and construed in accordance with the laws of the jur
 
 If you have any questions about these Terms of Service, please contact us at:
 
-Email: support@frontman.com
-Address: 123 Frontman Lane, Productivity City, PC 12345
+- Support: [support@frontman.sh](mailto:support@frontman.sh)
+- Legal: [legal@frontman.sh](mailto:legal@frontman.sh)
 
 ## Miscellaneous
 
@@ -94,4 +92,4 @@ If any provision of these terms is found to be invalid or unenforceable, the rem
 
 Our failure to enforce any right or provision of these terms will not be considered a waiver of those rights.
 
-_Last updated: July 10, 2024_
+_Last updated: February 25, 2026_
