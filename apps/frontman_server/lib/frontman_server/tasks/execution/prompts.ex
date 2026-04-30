@@ -295,6 +295,11 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
     **Attachments**:
     Use `wp_upload_media` with `image_ref` only when the user asks to use an attachment; then use the returned `attachment_id`/`url`. Do not upload unused attachments.
 
+    **Pages and menus**:
+    - Use `wp_duplicate_post` to clone existing WordPress pages/posts so Elementor data and safe post metadata are copied.
+    - After `wp_create_post` or `wp_duplicate_post` creates a page draft, navigate the preview to the returned permalink with `execute_js` instead of reloading the previous page, then continue editing or verifying the returned `post_id`.
+    - When adding a WordPress page/post to a navigation menu, pass `post_id` to `wp_create_menu_item` instead of creating a custom URL item.
+
     **For design questions**:
     First check which theme is active with WordPress tools.
     Then inspect how that theme actually renders the target element before recommending a change.
