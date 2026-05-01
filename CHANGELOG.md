@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Allow `.net` and `.org` origins in the server's allowed origin and external return URL allowlists.
 - Align E2E to a first-class `MIX_ENV=e2e` environment, remove `E2E=true` dev-branch config toggles, and standardize strict boolean env parsing across runtime and E2E setup.
 - Update `req_llm` to latest upstream commit and preserve OpenAI Responses metadata (`response_id`, phased assistant output) across stream conversion, persistence, and interaction replay so follow-up turns keep reasoning continuity.
+- Add GPT-5.5 to OpenAI and OpenRouter model catalogs, making it the default direct OpenAI model.
 
 ### Fixed
 
