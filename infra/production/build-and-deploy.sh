@@ -27,15 +27,32 @@ echo "=== Frontman Build & Deploy ==="
 echo "Build dir: ${BUILD_DIR}"
 echo ""
 
+ensure_elixir_build_tools() {
+  if mix hex.info >/dev/null 2>&1; then
+    echo "Hex already installed."
+  else
+    echo "Hex missing; installing from source..."
+    mix archive.install github hexpm/hex branch latest --force
+  fi
+
+  echo "Installing Rebar..."
+  REBAR_TMP=$(mktemp -t rebar3.XXXXXX)
+  curl -fsSL "https://s3.amazonaws.com/rebar3/rebar3" -o "${REBAR_TMP}"
+  chmod +x "${REBAR_TMP}"
+  mix local.rebar rebar3 "${REBAR_TMP}" --force
+  rm -f "${REBAR_TMP}"
+}
+
 # =============================================================================
 # Phase 1: Build (Elixir only — no JS/ReScript needed for server)
 # =============================================================================
 cd "${BUILD_DIR}/apps/frontman_server"
 export MIX_ENV=prod
 
+echo ">>> Ensuring Elixir build tools..."
+ensure_elixir_build_tools
+
 echo ">>> Installing Elixir dependencies..."
-mix local.hex --force --if-missing
-mix local.rebar --force --if-missing
 mix deps.get --only prod
 
 echo ">>> Compiling Elixir deps..."
