@@ -18,6 +18,10 @@ HEALTH_PATH="/health"
 HEALTH_TIMEOUT=30
 HEALTH_INTERVAL=2
 KEEP_RELEASES=3
+HEX_ARCHIVE_URL="https://repo.hex.pm/installs/1.19.0/hex-2.4.2-otp-28.ez"
+HEX_ARCHIVE_SHA512="618c609d3facf0be67dd829d886793d9bb65dfac34c354d5696114483b076333f3b16d87a70a675adc3dea8090b965fe23bcdc5f7674b06750a5c3e8ea913c38"
+REBAR_URL="https://s3.amazonaws.com/rebar3/rebar3"
+REBAR_SHA512="0d00494d849fdc521a55142278d1f6ba552954fbd65b80d40df8022f594f05d6c99ed1d731bc263691a04176e11d4c6e126c56ba20dca19c5e42d4ffab2e7e36"
 
 # --- Activate mise ---
 export PATH="/home/deploy/.local/bin:${PATH}"
@@ -28,18 +32,17 @@ echo "Build dir: ${BUILD_DIR}"
 echo ""
 
 ensure_elixir_build_tools() {
-  if mix hex.info >/dev/null 2>&1; then
-    echo "Hex already installed."
-  else
-    echo "Hex missing; installing from source..."
-    mix archive.install github hexpm/hex branch latest --force
-  fi
+  echo "Installing pinned Hex archive..."
+  HEX_TMP=$(mktemp -t hex.XXXXXX.ez)
+  curl -fsSL "${HEX_ARCHIVE_URL}" -o "${HEX_TMP}"
+  mix archive.install "${HEX_TMP}" --sha512 "${HEX_ARCHIVE_SHA512}" --force
+  rm -f "${HEX_TMP}"
 
-  echo "Installing Rebar..."
+  echo "Installing pinned Rebar..."
   REBAR_TMP=$(mktemp -t rebar3.XXXXXX)
-  curl -fsSL "https://s3.amazonaws.com/rebar3/rebar3" -o "${REBAR_TMP}"
+  curl -fsSL "${REBAR_URL}" -o "${REBAR_TMP}"
   chmod +x "${REBAR_TMP}"
-  mix local.rebar rebar3 "${REBAR_TMP}" --force
+  mix local.rebar rebar3 "${REBAR_TMP}" --sha512 "${REBAR_SHA512}" --force
   rm -f "${REBAR_TMP}"
 }
 
