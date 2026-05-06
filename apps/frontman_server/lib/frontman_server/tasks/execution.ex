@@ -80,7 +80,6 @@ defmodule FrontmanServer.Tasks.Execution do
         llm_opts =
           llm_opts
           |> maybe_enable_prompt_cache(api_key_info.provider)
-          |> maybe_disable_parallel_tool_calls(task.framework)
 
         task_id = task.task_id
         agent = build_agent(task, tools, model_spec, llm_opts, task.framework)
@@ -163,13 +162,6 @@ defmodule FrontmanServer.Tasks.Execution do
     do: Keyword.put(opts, :anthropic_prompt_cache, true)
 
   defp maybe_enable_prompt_cache(opts, _provider), do: opts
-
-  defp maybe_disable_parallel_tool_calls(llm_opts, %Framework{id: :wordpress}) do
-    # WordPress tools mutate external state; serial calls avoid stale Elementor rollback races.
-    Keyword.put(llm_opts, :parallel_tool_calls, false)
-  end
-
-  defp maybe_disable_parallel_tool_calls(llm_opts, _framework), do: llm_opts
 
   defp tool_execution_mode(%Framework{id: :wordpress}), do: :serial
   defp tool_execution_mode(_framework), do: :parallel

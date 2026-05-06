@@ -37,7 +37,6 @@ defmodule FrontmanServer.Providers.PrepareApiKeyTest do
       assert resolved.key_source == :oauth_token
       assert resolved.api_key == "oauth_access"
       assert resolved.provider == "anthropic"
-      assert resolved.requires_mcp_prefix == true
       assert resolved.with_claude_subscription == true
       assert resolved.auth_mode == :oauth
     end
@@ -52,7 +51,6 @@ defmodule FrontmanServer.Providers.PrepareApiKeyTest do
       assert resolved.key_source == :user_key
       assert resolved.api_key == "user_key_456"
       assert resolved.provider == "anthropic"
-      assert resolved.requires_mcp_prefix == false
       assert resolved.auth_mode == :api_key
     end
 

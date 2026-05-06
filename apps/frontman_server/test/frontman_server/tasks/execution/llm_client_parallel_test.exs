@@ -9,9 +9,9 @@ defmodule FrontmanServer.Tasks.Execution.LLMClientParallelTest do
   setup :verify_on_exit!
 
   describe "parallel_tool_calls" do
-    test "parallel_tool_calls is enabled by default in provider opts" do
+    test "parallel_tool_calls is not added to provider opts" do
       expect(LLMProviderMock, :stream_text, fn _model, _messages, opts ->
-        assert Keyword.fetch!(opts, :parallel_tool_calls) == true
+        refute Keyword.has_key?(opts, :parallel_tool_calls)
         {:ok, stream_response([])}
       end)
 
@@ -19,9 +19,9 @@ defmodule FrontmanServer.Tasks.Execution.LLMClientParallelTest do
       assert {:ok, _stream} = SwarmAi.LLM.stream(client, [SwarmAi.Message.user("Hello")], [])
     end
 
-    test "caller can override parallel_tool_calls to false in provider opts" do
+    test "caller-provided parallel_tool_calls is not passed to ReqLLM" do
       expect(LLMProviderMock, :stream_text, fn _model, _messages, opts ->
-        assert Keyword.fetch!(opts, :parallel_tool_calls) == false
+        refute Keyword.has_key?(opts, :parallel_tool_calls)
         {:ok, stream_response([])}
       end)
 

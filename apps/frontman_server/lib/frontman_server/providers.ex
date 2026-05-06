@@ -361,8 +361,7 @@ defmodule FrontmanServer.Providers do
   defp maybe_resolve_oauth_token(scope, "anthropic") do
     case get_valid_oauth_token(scope, "anthropic") do
       {:ok, access_token} ->
-        {:oauth_token, access_token,
-         requires_mcp_prefix: true, with_claude_subscription: true, auth_mode: :oauth}
+        {:oauth_token, access_token, with_claude_subscription: true, auth_mode: :oauth}
 
       {:error, _} ->
         :no_oauth_token
