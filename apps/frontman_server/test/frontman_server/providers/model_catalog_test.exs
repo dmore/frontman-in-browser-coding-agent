@@ -37,7 +37,7 @@ defmodule FrontmanServer.Providers.ModelCatalogTest do
         ModelCatalog.models("openrouter", :full) |> Enum.map(& &1.value) |> MapSet.new()
 
       assert MapSet.subset?(
-               MapSet.new(~w[gpt-5.5 gpt-5.4 gpt-5.3-codex]),
+               MapSet.new(~w[gpt-5.5 gpt-5.4 gpt-5.4-mini gpt-5.3-codex]),
                openai_values
              )
 

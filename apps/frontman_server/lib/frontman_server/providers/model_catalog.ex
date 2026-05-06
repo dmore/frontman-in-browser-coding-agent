@@ -63,6 +63,7 @@ defmodule FrontmanServer.Providers.ModelCatalog do
   @openai_models [
     %{displayName: "GPT-5.5", value: "gpt-5.5"},
     %{displayName: "GPT-5.4", value: "gpt-5.4"},
+    %{displayName: "GPT-5.4 Mini", value: "gpt-5.4-mini"},
     %{displayName: "GPT-5.3 Codex", value: "gpt-5.3-codex"}
   ]
 

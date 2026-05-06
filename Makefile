@@ -98,6 +98,8 @@ dev-nextjs: ## Start development server for Next.js test site
 	cd test/sites/blog-starter && $(MAKE) dev
 
 dev-marketing: ## Start development server for marketing site
+	@printf "$(YELLOW)Waiting for server on localhost:4000...$(RESET)\n"
+	@bash -c 'while ! (: > /dev/tcp/localhost/4000) 2>/dev/null; do sleep 1; done'
 	@printf "$(YELLOW)Starting marketing dev server...$(RESET)\n"
 	cd apps/marketing && $(MAKE) dev
 ## DEV_END

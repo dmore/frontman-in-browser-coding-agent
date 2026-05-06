@@ -102,6 +102,21 @@ defmodule FrontmanServer.Providers.ResolvedKeyTest do
       end
     end
 
+    test "routes GPT-5.4 Mini through openai_codex" do
+      key = resolved_key_fixture("openai", model: "openai:gpt-5.4-mini")
+
+      {model_spec, _llm_opts} = ResolvedKey.to_llm_args(key)
+
+      case model_spec do
+        %{provider: provider, id: id} ->
+          assert provider == :openai_codex
+          assert id == "gpt-5.4-mini"
+
+        string when is_binary(string) ->
+          assert string == "openai_codex:gpt-5.4-mini"
+      end
+    end
+
     test "handles nil chatgpt_account_id" do
       key = resolved_key_fixture("openai")
 
