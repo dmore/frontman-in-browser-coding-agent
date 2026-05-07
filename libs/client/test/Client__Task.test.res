@@ -5,24 +5,29 @@ module Message = Client__Task__Types.Message
 module TaskReducer = Client__Task__Reducer
 
 module TestHelpers = {
-  let makeLoadedTask = (~id="test-task-1", ~messages=[], ~previewUrl="http://localhost:3000") => {
-    Task.makeNew(~previewUrl)
-    ->Task.newToLoaded(~id, ~title="Test Task")
-    ->Task.updateLoadedData(data => {...data, messages})
+  let makeLoadedTask = () => {
+    Task.makeNew(~previewUrl="http://localhost:3000")
+    ->Task.newToLoaded(~id="test-task-1", ~title="Test Task")
+    ->Task.updateLoadedData(data => {...data, messages: []})
   }
 
-  let makeUnloadedTask = (~id="test-task-1") => {
-    Task.makeUnloaded(~id, ~title="Test Task", ~createdAt=Date.now(), ~updatedAt=Date.now())
-  }
-
-  let makeLoadingTask = (~id="test-task-1", ~previewUrl="http://localhost:3000") => {
-    let unloaded = Task.makeUnloaded(
-      ~id,
+  let makeUnloadedTask = () => {
+    Task.makeUnloaded(
+      ~id="test-task-1",
       ~title="Test Task",
       ~createdAt=Date.now(),
       ~updatedAt=Date.now(),
     )
-    TaskReducer.next(unloaded, LoadStarted({previewUrl: previewUrl}))->Pair.first
+  }
+
+  let makeLoadingTask = () => {
+    let unloaded = Task.makeUnloaded(
+      ~id="test-task-1",
+      ~title="Test Task",
+      ~createdAt=Date.now(),
+      ~updatedAt=Date.now(),
+    )
+    TaskReducer.next(unloaded, LoadStarted({previewUrl: "http://localhost:3000"}))->Pair.first
   }
 
   // Helper to get messages from loaded tasks (unwraps the option)
@@ -392,7 +397,6 @@ describe("Task - Error Handling", () => {
       AgentError({
         error: "Rate limit exceeded",
         timestamp: "2025-01-15T10:30:00Z",
-        retryable: false,
         category: "unknown",
       }),
     )
@@ -426,7 +430,6 @@ describe("Task - Error Handling", () => {
       AgentError({
         error: "Some error",
         timestamp: "2025-01-15T10:30:00Z",
-        retryable: false,
         category: "unknown",
       }),
     )
@@ -462,7 +465,6 @@ describe("Task - Error Handling", () => {
       AgentError({
         error: "Error occurred",
         timestamp: "2025-01-15T10:30:00Z",
-        retryable: false,
         category: "unknown",
       }),
     )
@@ -484,7 +486,6 @@ describe("Task - Error Handling", () => {
       AgentError({
         error: "Error",
         timestamp: "2025-01-15T10:30:00Z",
-        retryable: false,
         category: "unknown",
       }),
     )
@@ -503,7 +504,6 @@ describe("Task - Error Handling", () => {
       AgentError({
         error: "Some error",
         timestamp: "2025-01-15T10:30:00Z",
-        retryable: false,
         category: "unknown",
       }),
     )
@@ -537,7 +537,6 @@ describe("Task - Error Handling", () => {
       AgentError({
         error: "Previous error",
         timestamp: "2025-01-15T10:30:00Z",
-        retryable: false,
         category: "unknown",
       }),
     )
@@ -690,7 +689,6 @@ describe("Task - CancelTurn", () => {
       AgentError({
         error: "Some error",
         timestamp: "2025-01-15T10:30:00Z",
-        retryable: false,
         category: "unknown",
       }),
     )
@@ -902,7 +900,6 @@ describe("Task - Annotations Cleared on Send (Issue #466)", () => {
       task1,
       ToggleAnnotation({
         element: el1,
-        position: {xPercent: 50.0, yAbsolute: 100.0},
         tagName: "button",
       }),
     )
@@ -910,7 +907,6 @@ describe("Task - Annotations Cleared on Send (Issue #466)", () => {
       task2,
       ToggleAnnotation({
         element: el2,
-        position: {xPercent: 30.0, yAbsolute: 200.0},
         tagName: "div",
       }),
     )
@@ -1298,7 +1294,6 @@ describe("Task - Annotation Enrichment Lifecycle (Issue #582)", () => {
       task1,
       ToggleAnnotation({
         element: el,
-        position: {xPercent: 50.0, yAbsolute: 100.0},
         tagName: "button",
       }),
     )
@@ -1323,7 +1318,6 @@ describe("Task - Annotation Enrichment Lifecycle (Issue #582)", () => {
     ~cssClasses: option<string>=?,
     ~nearbyText: option<string>=?,
     ~boundingBox: option<Annotation.boundingBox>=?,
-    ~elementorContext: option<Client__ElementorDetection.t>=?,
     ~enrichmentStatus: Annotation.enrichmentStatus=Enriched,
   ): TaskReducer.action => AnnotationDetailsResolved({
     id,
@@ -1333,24 +1327,14 @@ describe("Task - Annotation Enrichment Lifecycle (Issue #582)", () => {
     cssClasses,
     nearbyText,
     boundingBox,
-    elementorContext,
+    elementorContext: None,
     enrichmentStatus,
   })
 
   // Helper: create an enriching annotation then resolve it, returning the resolved task
-  let _resolveAnnotation = (
-    task,
-    effects,
-    ~enrichmentStatus=Annotation.Enriched,
-    ~selector=Ok(None),
-    ~screenshot=Ok(None),
-    ~sourceLocation=Ok(None),
-  ) => {
+  let _resolveAnnotation = (task, effects, ~enrichmentStatus=Annotation.Enriched) => {
     let id = _getAnnotationIdFromEffect(effects)
-    let (resolved, _) = TaskReducer.next(
-      task,
-      _makeResolved(~id, ~selector, ~screenshot, ~sourceLocation, ~enrichmentStatus),
-    )
+    let (resolved, _) = TaskReducer.next(task, _makeResolved(~id, ~enrichmentStatus))
     resolved
   }
 
@@ -1499,7 +1483,6 @@ describe("Task - Annotation Enrichment Lifecycle (Issue #582)", () => {
       task1,
       ToggleAnnotation({
         element: el1,
-        position: {xPercent: 50.0, yAbsolute: 100.0},
         tagName: "button",
       }),
     )
@@ -1507,7 +1490,6 @@ describe("Task - Annotation Enrichment Lifecycle (Issue #582)", () => {
       task2,
       ToggleAnnotation({
         element: el2,
-        position: {xPercent: 30.0, yAbsolute: 200.0},
         tagName: "div",
       }),
     )

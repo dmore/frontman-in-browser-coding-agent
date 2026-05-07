@@ -1,12 +1,12 @@
 /**
  * ToolGroupUtils - Logic for grouping consecutive tool calls
- * 
+ *
  * Groups consecutive "exploration" tools (read, list, search, grep)
  * into collapsible "Explored" summaries while keeping "action" tools separate.
- * 
+ *
  * Uses substring-based pattern matching to handle various tool naming conventions
  * (MCP tools, backend tools, etc.)
- * 
+ *
  * Key rules:
  * - Read-only operations are grouped → Reduces noise
  * - Mutations break groups → Important changes are always visible
@@ -54,9 +54,6 @@ module BrowserAction = {
 
   let fromLowercaseToolName = (name: string): option<t> =>
     all->Array.find(action => matchesLowercaseToolName(name, action))
-
-  let fromToolName = (toolNameToMatch: string): option<t> =>
-    toolNameToMatch->String.toLowerCase->fromLowercaseToolName
 }
 
 let browserExplorationNeedles = ["snapshot", "screenshot", "console", "network"]
@@ -216,10 +213,10 @@ let unique = (arr: array<string>): array<string> => {
 /**
  * Generate summary labels from statistics
  * Returns an array like ["1 directory", "2 files", "3 searches"]
- * 
+ *
  * Activity Order:
  * 1. list → "N director(y|ies)"
- * 2. file → "N file(s)"  
+ * 2. file → "N file(s)"
  * 3. search → "N search(es)"
  * 4. definition → "found N definition(s)"
  * 5. snapshot → "N snapshot(s)"
@@ -300,7 +297,7 @@ let hasError = (tc: Message.toolCall): bool => {
 
 /**
  * Group consecutive tool calls into display items
- * 
+ *
  * Algorithm:
  * 1. For each message, check if it's groupable
  * 2. If groupable AND no error → add to current group
@@ -310,14 +307,11 @@ let hasError = (tc: Message.toolCall): bool => {
  * 6. Subagent tool calls (identified by parentAgentId) are grouped separately with "Processed" prefix
  *
  * @param toolCalls Array of tool calls to group
- * @param groupSubagents Whether to group subagent tool calls (default: true)
  * @param minGroupSize Minimum tools needed to form a group (default: 2)
  */
-let groupToolCalls = (
-  toolCalls: array<Message.toolCall>,
-  ~groupSubagents: bool=true,
-  ~minGroupSize: int=1,
-): array<Types.displayItem> => {
+let groupToolCalls = (toolCalls: array<Message.toolCall>, ~minGroupSize: int): array<
+  Types.displayItem,
+> => {
   let result: array<Types.displayItem> = []
   let currentGroup: ref<array<Message.toolCall>> = ref([])
   let currentGroupType: ref<option<Types.groupType>> = ref(None)
@@ -376,28 +370,24 @@ let groupToolCalls = (
   toolCalls->Array.forEach(tc => {
     let isSubagent = isSubagentToolCall(tc)
 
-    // Only check subagent switching when groupSubagents is true
-    // When groupSubagents is false, we're treating all tools as normal tools
-    if groupSubagents {
-      // If switching between subagent and main agent, flush the current group
-      if currentIsSubagent.contents != isSubagent && Array.length(currentGroup.contents) > 0 {
-        flushGroup()
-      }
+    // If switching between subagent and main agent, flush the current group
+    if currentIsSubagent.contents != isSubagent && Array.length(currentGroup.contents) > 0 {
+      flushGroup()
+    }
 
-      // If switching to a different subagent (different parentAgentId), flush the current group
-      if isSubagent && currentIsSubagent.contents {
-        let currentParent = currentParentAgentId.contents
-        let newParent = tc.parentAgentId
-        switch (currentParent, newParent) {
-        | (Some(current), Some(new_)) if current != new_ =>
-          // Different subagent - flush and start new group
-          flushGroup()
-        | _ => ()
-        }
+    // If switching to a different subagent (different parentAgentId), flush the current group
+    if isSubagent && currentIsSubagent.contents {
+      let currentParent = currentParentAgentId.contents
+      let newParent = tc.parentAgentId
+      switch (currentParent, newParent) {
+      | (Some(current), Some(new_)) if current != new_ =>
+        // Different subagent - flush and start new group
+        flushGroup()
+      | _ => ()
       }
     }
 
-    if isSubagent && groupSubagents {
+    if isSubagent {
       // Subagent tool calls are grouped together regardless of tool type
       // INCLUDING error states - we want to keep the group together
       currentIsSubagent := true
@@ -434,7 +424,7 @@ let groupToolCalls = (
  * Returns "Exploring" if any tool is still loading OR if group is still open
  * A group is "open" when it's the last group and the agent is still running
  */
-let getGroupPrefix = (group: Types.toolGroup, ~isOpen: bool=false): string => {
+let getGroupPrefix = (group: Types.toolGroup, ~isOpen: bool): string => {
   let isLoading = group.toolCalls->Array.some(tc => {
     switch tc.state {
     | Message.InputStreaming | Message.InputAvailable => true

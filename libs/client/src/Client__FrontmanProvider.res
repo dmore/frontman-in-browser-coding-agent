@@ -131,6 +131,7 @@ let () = Client__TextDeltaBuffer.flushUserMessageBuffer := _flushUserMessageBuff
 type connectionState = Reducer.Selectors.connectionStatus
 
 // Context value type
+@@live
 type contextValue = {
   connectionState: connectionState,
   isSendingPrompt: bool,
@@ -249,7 +250,6 @@ module Provider = {
         loginUrl,
         clientName,
         clientVersion,
-        baseUrl,
         onACPMessage: logACPMessage,
         _meta,
         onTitleUpdated: Some(
@@ -380,7 +380,6 @@ module Provider = {
             ~taskId,
             ~error=message,
             ~timestamp,
-            ~retryable=false,
             ~category=category->Option.getOr("unknown"),
           )
         }

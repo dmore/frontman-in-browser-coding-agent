@@ -11,61 +11,6 @@ module AssistantContentPart = Client__Message.AssistantContentPart
 module Message = Client__Message
 
 module Annotation = Client__Annotation__Types
-
-// Todo - single source of truth for todo state (updated by reducer)
-module Todo = {
-  type status =
-    | Pending
-    | InProgress
-    | Completed
-
-  type t = {
-    id: string,
-    content: string,
-    activeForm: string,
-    status: status,
-    createdAt: float,
-    updatedAt: float,
-  }
-
-  let parseStatus = (statusStr: string): status => {
-    switch String.toLowerCase(statusStr) {
-    | "in_progress" | "in-progress" | "inprogress" => InProgress
-    | "completed" | "complete" | "done" => Completed
-    | _ => Pending
-    }
-  }
-
-  // Parse a Todo from JSON tool result
-  let fromResult = (json: JSON.t): t => {
-    let statusSchema = S.string->S.transform(_ => {
-      parser: str => parseStatus(str),
-      serializer: status =>
-        switch status {
-        | Pending => "pending"
-        | InProgress => "in_progress"
-        | Completed => "completed"
-        },
-    })
-
-    let schema = S.object(s => (
-      s.field("id", S.string),
-      s.field("content", S.string),
-      s.field("active_form", S.string),
-      s.field("status", statusSchema),
-    ))
-
-    let (id, content, activeForm, status) = S.parseOrThrow(json, schema)
-    let now = Date.now()
-    {id, content, activeForm, status, createdAt: now, updatedAt: now}
-  }
-
-  // Extract todo ID from a remove result
-  let idFromResult = (json: JSON.t): string => {
-    S.parseOrThrow(json, S.object(s => s.field("id", S.string)))
-  }
-}
-
 // Re-export ACP types for convenience
 module ACPTypes = FrontmanAiFrontmanProtocol.FrontmanProtocol__ACP
 
@@ -105,7 +50,6 @@ module Task = {
         annotationMode: Annotation.annotationMode,
         annotations: array<Annotation.t>,
         activePopupAnnotationId: option<string>,
-        isAnimationFrozen: bool,
       })
     // Unloaded: persisted but only metadata loaded
     | Unloaded({id: string, title: string, createdAt: float, updatedAt: float})
@@ -120,7 +64,6 @@ module Task = {
         annotationMode: Annotation.annotationMode,
         annotations: array<Annotation.t>,
         activePopupAnnotationId: option<string>,
-        isAnimationFrozen: bool,
       })
     // Loaded: fully interactive
     // clientId is preserved from New state during promotion to maintain iframe identity
@@ -135,7 +78,6 @@ module Task = {
         annotationMode: Annotation.annotationMode,
         annotations: array<Annotation.t>,
         activePopupAnnotationId: option<string>,
-        isAnimationFrozen: bool,
         isAgentRunning: bool,
         planEntries: array<ACPTypes.planEntry>,
         turnError: option<turnErrorInfo>,
@@ -191,12 +133,6 @@ module Task = {
     | Unloaded({title}) | Loading({title}) | Loaded({title}) => Some(title)
     }
 
-  let getCreatedAt = (task: t): option<float> =>
-    switch task {
-    | New(_) => None
-    | Unloaded({createdAt}) | Loading({createdAt}) | Loaded({createdAt}) => Some(createdAt)
-    }
-
   let getUpdatedAt = (task: t): option<float> =>
     switch task {
     | New(_) => None
@@ -242,13 +178,6 @@ module Task = {
     | Unloaded(_) => None
     | Loading({activePopupAnnotationId})
     | Loaded({activePopupAnnotationId}) => activePopupAnnotationId
-    }
-
-  let getIsAnimationFrozen = (task: t): bool =>
-    switch task {
-    | New({isAnimationFrozen}) => isAnimationFrozen
-    | Unloaded(_) => false
-    | Loading({isAnimationFrozen}) | Loaded({isAnimationFrozen}) => isAnimationFrozen
     }
 
   let getImageAttachments = (task: t): Dict.t<Client__Message.fileAttachmentData> =>
@@ -321,7 +250,6 @@ module Task = {
       annotationMode: Annotation.Off,
       annotations: [],
       activePopupAnnotationId: None,
-      isAnimationFrozen: false,
     })
   }
 
@@ -340,14 +268,7 @@ module Task = {
   // Preserves clientId for stable React keying (prevents iframe remount)
   let newToLoaded = (task: t, ~id: string, ~title: string): t => {
     switch task {
-    | New({
-        clientId,
-        previewFrame,
-        annotationMode,
-        annotations,
-        activePopupAnnotationId,
-        isAnimationFrozen,
-      }) =>
+    | New({clientId, previewFrame, annotationMode, annotations, activePopupAnnotationId}) =>
       let timestamp = Date.now()
       Loaded({
         id,
@@ -360,7 +281,6 @@ module Task = {
         annotationMode,
         annotations,
         activePopupAnnotationId,
-        isAnimationFrozen,
         isAgentRunning: false,
         planEntries: [],
         turnError: None,
@@ -378,7 +298,6 @@ module Task = {
     annotationMode: Annotation.annotationMode,
     annotations: array<Annotation.t>,
     activePopupAnnotationId: option<string>,
-    isAnimationFrozen: bool,
     isAgentRunning: bool,
     planEntries: array<ACPTypes.planEntry>,
     turnError: option<turnErrorInfo>,
@@ -390,10 +309,10 @@ module Task = {
     ~title: string,
     ~previewUrl: string,
     ~createdAt: float,
-    ~updatedAt: option<float>=?,
+    ~updatedAt: float,
   ): t => {
     let _ = previewUrl
-    makeUnloaded(~id, ~title, ~createdAt, ~updatedAt=updatedAt->Option.getOr(createdAt))
+    makeUnloaded(~id, ~title, ~createdAt, ~updatedAt)
   }
 
   let updateLoadedData = (task: t, fn: loadedData => loadedData): t => {
@@ -409,7 +328,6 @@ module Task = {
         annotationMode,
         annotations,
         activePopupAnnotationId,
-        isAnimationFrozen,
         isAgentRunning,
         planEntries,
         turnError,
@@ -422,7 +340,6 @@ module Task = {
           annotationMode,
           annotations,
           activePopupAnnotationId,
-          isAnimationFrozen,
           isAgentRunning,
           planEntries,
           turnError,
@@ -440,7 +357,6 @@ module Task = {
           annotationMode: updated.annotationMode,
           annotations: updated.annotations,
           activePopupAnnotationId: updated.activePopupAnnotationId,
-          isAnimationFrozen: updated.isAnimationFrozen,
           isAgentRunning: updated.isAgentRunning,
           planEntries: updated.planEntries,
           turnError: updated.turnError,
@@ -459,14 +375,12 @@ module Task = {
         annotationMode,
         annotations,
         activePopupAnnotationId,
-        isAnimationFrozen,
       }) => {
         let data = {
           messages: Client__MessageStore.toArray(messages),
           annotationMode,
           annotations,
           activePopupAnnotationId,
-          isAnimationFrozen,
           isAgentRunning: false,
           planEntries: [],
           turnError: None,
@@ -483,23 +397,14 @@ module Task = {
           annotationMode: updated.annotationMode,
           annotations: updated.annotations,
           activePopupAnnotationId: updated.activePopupAnnotationId,
-          isAnimationFrozen: updated.isAnimationFrozen,
         })
       }
-    | New({
-        clientId,
-        previewFrame,
-        annotationMode,
-        annotations,
-        activePopupAnnotationId,
-        isAnimationFrozen,
-      }) => {
+    | New({clientId, previewFrame, annotationMode, annotations, activePopupAnnotationId}) => {
         let data = {
           messages: [],
           annotationMode,
           annotations,
           activePopupAnnotationId,
-          isAnimationFrozen,
           isAgentRunning: false,
           planEntries: [],
           turnError: None,
@@ -512,7 +417,6 @@ module Task = {
           annotationMode: updated.annotationMode,
           annotations: updated.annotations,
           activePopupAnnotationId: updated.activePopupAnnotationId,
-          isAnimationFrozen: updated.isAnimationFrozen,
         })
       }
     | Unloaded(_) => task
@@ -602,6 +506,7 @@ let rec parentLocationToJson = (loc: parentLocationMeta): JSON.t => {
 // because the recursive parentLocationMeta cannot use S.recursive with S.dict(S.json).
 type annotationMeta = {
   annotation: bool,
+  @live
   annotationIndex: int,
   annotationId: string,
   tagName: string,
@@ -669,6 +574,7 @@ let nearbyTextWithElementorHint = (
 
 type screenshotMeta = {
   annotationScreenshot: bool,
+  @live
   annotationIndex: int,
   annotationId: string,
 }
