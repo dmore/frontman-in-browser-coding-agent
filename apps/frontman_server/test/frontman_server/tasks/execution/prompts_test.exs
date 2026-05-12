@@ -30,18 +30,21 @@ defmodule FrontmanServer.Tasks.Execution.PromptsTest do
       assert prompt =~ "image_ref"
     end
 
-    test "wordpress framework marks file tools read-only" do
+    test "wordpress framework excludes filesystem tool guidance" do
       fw = Framework.from_string("wordpress")
       prompt = Prompts.build(framework: fw)
 
-      assert prompt =~ "read-only file tools"
-      assert prompt =~ "Do not attempt to edit unmanaged theme or plugin files"
-      assert prompt =~ "block themes only"
-      assert prompt =~ "already a child theme"
+      assert prompt =~ "Do not use filesystem tools in WordPress sessions"
+      assert prompt =~ "not available in the WordPress plugin runtime"
+      assert prompt =~ "wp_get_site_info"
+      assert prompt =~ "wp_read_template"
+      assert prompt =~ "manual guidance"
       refute prompt =~ "selection_scope"
       assert prompt =~ "Restore Elementor rollbacks one at a time"
       assert prompt =~ "navigate the preview to the returned permalink"
       refute prompt =~ "use `write_file` with the attachment's `image_ref`"
+      refute prompt =~ "wp_create_managed_theme"
+      refute prompt =~ "wp_write_managed_theme_file"
 
       assert prompt =~ "Do not upload unused attachments"
     end

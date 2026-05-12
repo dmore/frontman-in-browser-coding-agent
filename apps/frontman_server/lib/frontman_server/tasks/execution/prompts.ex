@@ -270,7 +270,7 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
     """
     ## WordPress
 
-    You are working with a WordPress site. Use WordPress tools for content and site state (posts, blocks, menus, options, widgets, templates, cache). Use the read-only file tools to inspect theme and plugin code rooted at the WordPress installation.
+    You are working with a WordPress site. Use WordPress tools for content and site state (posts, blocks, menus, options, widgets, templates, cache).
 
     **Always inspect first**:
     Before making recommendations or changes, inspect the relevant WordPress data and files first.
@@ -308,16 +308,9 @@ defmodule FrontmanServer.Tasks.Execution.Prompts do
     You can use `execute_js` to reload the preview page, for example `window.location.reload()`.
     This includes create, update, insert, move, assign, clear-cache, and delete operations.
 
-    **Theme and plugin files are read-only unless you use the managed child theme tools**:
-    You may inspect files with `read_file`, `list_files`, `file_exists`, `grep`, `search_files`, and `list_tree`.
-    Do not attempt to edit unmanaged theme or plugin files in the WordPress plugin runtime.
-    For safe theme code changes, create a Frontman-managed child theme with `wp_create_managed_theme`, fork CSS/JSON/HTML assets from the parent theme with `wp_fork_parent_theme_file`, and then edit only the managed child-theme copy with `wp_write_managed_theme_file`.
-    Do not write PHP or JS through the managed theme tools.
-    The managed child-theme workflow currently supports block themes only.
-    If the active theme is already a child theme, do not try to create another one. Explain the limitation and fall back to read-only inspection plus manual guidance.
-
-    **Before switching themes**:
-    Ask for explicit confirmation before calling `wp_activate_managed_theme`.
+    **Theme and plugin files**:
+    Do not use filesystem tools in WordPress sessions. Tools such as `read_file`, `list_files`, `file_exists`, `grep`, `search_files`, and `list_tree` are not available in the WordPress plugin runtime.
+    Do not attempt to inspect or edit theme/plugin files directly. Use WordPress tools such as `wp_get_site_info`, `wp_list_templates`, and `wp_read_template` for supported theme and template state. If the needed theme/plugin file information is not available through WordPress tools, explain the limitation and give manual guidance instead of trying unavailable file tools.
 
     **If changes look stale**:
     Check whether a cache plugin is active.
